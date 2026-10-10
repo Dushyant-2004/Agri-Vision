@@ -1,0 +1,60 @@
+# JavaScript dependencies and build output
+node_modules/
+.next/
+.next-dev/
+out/
+*.tsbuildinfo
+
+# Python environments, caches, coverage, and test output
+backend/.venv/
+backend/venv/
+backend/env/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Environment files and local configuration
+.env
+.env.*
+!.env.example
+*.local
+*.secret
+*.secrets
+
+# Logs and temporary files
+*.log
+*.tmp
+*.temp
+tmp/
+temp/
+
+# Credentials, certificates, and private keys
+*.pem
+*.key
+*.crt
+*.cer
+*.p12
+*.pfx
+credentials.json
+service-account*.json
+secrets/
+
+# Local uploads and potentially sensitive datasets
+uploads/
+backend/uploads/
+data/private/
+data/raw/
+*.sqlite
+*.sqlite3
+*.db
+
+# Operating-system and editor files
+.DS_Store
+Thumbs.db
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json

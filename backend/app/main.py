@@ -5,6 +5,7 @@ from typing import Annotated
 
 import httpx
 import pandas as pd
+import os
 from fastapi import FastAPI, File, HTTPException, Query, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -156,4 +157,71 @@ async def methodology() -> dict:
             "Forecasts use a transparent moving-average baseline with chronological holdout metrics.",
         ],
         "limitations": "Production data alone cannot estimate profitability, sustainability, or causality.",
+    }
+
+
+@app.get("/api/weather")
+async def weather(city: str = Query(default="New Delhi", min_length=1)) -> dict:
+    api_key = os.getenv("WEATHER_API_KEY")
+    if not api_key:
+        raise HTTPException(status_code=503, detail="WEATHER_API_KEY is not configured.")
+    try:
+        async with httpx.AsyncClient(timeout=15) as client:
+            response = await client.get(
+                "https://api.weatherapi.com/v1/forecast.json",
+                params={"key": api_key, "q": city, "days": 5, "aqi": "no", "alerts": "yes"},
+            )
+            response.raise_for_status()
+            payload = response.json()
+    except (httpx.HTTPError, ValueError) as error:
+        raise HTTPException(status_code=502, detail="WeatherAPI could not return weather for this location.") from error
+    location = payload["location"]
+    current = payload["current"]
+    return {
+        "location": f"{location['name']}, {location['country']}",
+        "updated": current["last_updated"],
+        "current": {
+            "temperature": current["temp_c"],
+            "condition": current["condition"]["text"],
+            "humidity": current["humidity"],
+            "rainfall": current["precip_mm"],
+            "wind": current["wind_kph"],
+        },
+        "forecast": [
+            {
+                "date": day["date"],
+                "temperature": day["day"]["avgtemp_c"],
+                "rainfall": day["day"]["totalprecip_mm"],
+                "condition": day["day"]["condition"]["text"],
+            }
+            for day in payload["forecast"]["forecastday"]
+        ],
+    }
+
+
+@app.get("/api/market-prices")
+async def market_prices() -> dict:
+    try:
+        async with httpx.AsyncClient(timeout=20) as client:
+            response = await client.get(
+                "https://fenixservices.fao.org/api/faostat/data/v1/en/PP",
+                params={"page_size": 20, "page_number": 1, "area_code": 100},
+            )
+            response.raise_for_status()
+            payload = response.json()
+    except (httpx.HTTPError, ValueError) as error:
+        raise HTTPException(status_code=502, detail="FAOSTAT market data is temporarily unavailable.") from error
+    records = payload.get("data", [])
+    return {
+        "source": "FAOSTAT · Producer Prices",
+        "records": [
+            {
+                "commodity": row.get("Item"),
+                "year": row.get("Year"),
+                "price": row.get("Value"),
+                "unit": row.get("Unit"),
+            }
+            for row in records[:20]
+            if row.get("Item") and row.get("Value") is not None
+        ],
     }

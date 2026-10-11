@@ -5,7 +5,8 @@ import Papa from "papaparse";
 import {
   BarChart3, BookOpen, ChevronRight, CloudDownload, Database, FileUp,
   Gauge, LayoutDashboard, Lightbulb, Menu, Search, Settings2, Sprout,
-  TrendingUp, Upload, UserCircle, LogOut, ChevronDown, X
+  TrendingUp, Upload, UserCircle, LogOut, ChevronDown, X, CloudSun, WalletCards,
+  FileText, Stethoscope, ShoppingBasket
 } from "lucide-react";
 import {
   Bar, BarChart, CartesianGrid, Line, LineChart, ResponsiveContainer,
@@ -27,7 +28,7 @@ type DataQuality = {
   invalid_numeric_or_negative_removed: number;
   duplicate_rows_removed: number;
 };
-type Section = "Overview" | "Data import" | "Visualizations" | "Forecasting" | "KPI evaluation" | "Recommendations" | "Methodology";
+type Section = "Overview" | "Data import" | "Visualizations" | "Forecasting" | "KPI evaluation" | "Recommendations" | "Methodology" | "Weather" | "Financials" | "Reports" | "Crop health" | "Market prices";
 type AuthMode = "login" | "signup";
 
 const SOURCES = [
@@ -86,6 +87,12 @@ export default function Home() {
   });
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [visualChart, setVisualChart] = useState<"line" | "bar" | "histogram">("line");
+  const [weatherCity, setWeatherCity] = useState("New Delhi");
+  const [weather, setWeather] = useState<{ location: string; updated: string; current: { temperature: number; condition: string; humidity: number; rainfall: number; wind: number }; forecast: { date: string; temperature: number; rainfall: number; condition: string }[] } | null>(null);
+  const [weatherError, setWeatherError] = useState("");
+  const [market, setMarket] = useState<{ commodity: string; year: string; price: string; unit: string }[]>([]);
+  const [marketError, setMarketError] = useState("");
+  const [diseaseImage, setDiseaseImage] = useState("");
 
   useEffect(() => {
     if (!authenticated) {
@@ -243,6 +250,37 @@ export default function Home() {
     link.download = "agrivision-filtered-production.csv"; link.click(); URL.revokeObjectURL(link.href);
   }
 
+  async function loadWeather() {
+    setWeatherError("");
+    try {
+      const response = await fetch(`${API_BASE}/api/weather?city=${encodeURIComponent(weatherCity)}`);
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.detail ?? "Weather data could not be loaded.");
+      setWeather(result);
+    } catch (weatherRequestError) {
+      setWeatherError(weatherRequestError instanceof Error ? weatherRequestError.message : "Weather data could not be loaded.");
+    }
+  }
+
+  async function loadMarket() {
+    setMarketError("");
+    try {
+      const response = await fetch(`${API_BASE}/api/market-prices`);
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.detail ?? "Market data could not be loaded.");
+      setMarket(result.records);
+    } catch (marketRequestError) {
+      setMarketError(marketRequestError instanceof Error ? marketRequestError.message : "Market data could not be loaded.");
+    }
+  }
+
+  function downloadReport() {
+    const report = `AgriVision report\n\nRecords: ${filtered.length}\nProduction: ${formatNumber(total)} tonnes\nGrowth: ${growth.toFixed(1)}%\nGenerated: ${new Date().toLocaleString()}\n`;
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(new Blob([report], { type: "text/plain" }));
+    link.download = "agrivision-report.txt"; link.click(); URL.revokeObjectURL(link.href);
+  }
+
   const nav: { label: Section; icon: React.ReactNode }[] = [
     { label: "Overview", icon: <LayoutDashboard size={18} /> },
     { label: "Data import", icon: <Database size={18} /> },
@@ -250,7 +288,12 @@ export default function Home() {
     { label: "Forecasting", icon: <TrendingUp size={18} /> },
     { label: "KPI evaluation", icon: <Gauge size={18} /> },
     { label: "Recommendations", icon: <Lightbulb size={18} /> },
-    { label: "Methodology", icon: <BookOpen size={18} /> }
+    { label: "Methodology", icon: <BookOpen size={18} /> },
+    { label: "Weather", icon: <CloudSun size={18} /> },
+    { label: "Financials", icon: <WalletCards size={18} /> },
+    { label: "Reports", icon: <FileText size={18} /> },
+    { label: "Crop health", icon: <Stethoscope size={18} /> },
+    { label: "Market prices", icon: <ShoppingBasket size={18} /> }
   ];
 
   return <div className="app-shell">
@@ -265,10 +308,33 @@ export default function Home() {
       <div className="content">
         {error && <div className="alert error">{error} Check your internet connection and reload.</div>}
         <div className="page-heading"><div><p className="eyebrow">AGRICULTURAL INTELLIGENCE · 2026</p><h1>{section === "Overview" ? "Production overview" : section}</h1><p className="subtitle">{section === "Overview" ? "Turn production data into decisions you can defend." : "Explore the evidence behind your agribusiness decisions."}</p><p className="data-source">Source: <b>{dataSource}</b>{lastUpdated && <> · Updated {lastUpdated.toLocaleTimeString()}</>}</p></div>{section !== "KPI evaluation" && <div className="filters"><label>Country<select value={country} onChange={(e) => setCountry(e.target.value)}><option>All geographies</option>{countries.slice(0, 80).map((c) => <option key={c}>{c}</option>)}</select></label><label>Crop<select value={crop} onChange={(e) => setCrop(e.target.value)}><option>All crops</option>{crops.map((c) => <option key={c}>{c}</option>)}</select></label><label>Year<select value={year} onChange={(e) => setYear(e.target.value)}><option>All years</option>{years.slice(-30).map((y) => <option key={y}>{y}</option>)}</select></label></div>}</div>
-        {section === "Data import" ? <ImportPanel upload={upload} message={uploadMessage} rowCount={rows.length} source={dataSource} /> : section === "Methodology" ? <Methodology rows={rows} filtered={filtered} source={dataSource} lastUpdated={lastUpdated} quality={quality} /> : section === "Forecasting" ? <Forecast yearly={yearly} /> : section === "KPI evaluation" ? <Kpi filtered={filtered} total={total} growth={growth} concentration={concentration} targetGrowth={targetGrowth} setTargetGrowth={setTargetGrowth} /> : section === "Recommendations" ? <Recommendations filtered={filtered} growth={growth} concentration={concentration} targetGrowth={targetGrowth} crop={byCrop[0]?.name} /> : section === "Visualizations" ? <Visualizations filtered={filtered} byCrop={byCrop} chartType={visualChart} setChartType={setVisualChart} loading={loading} /> : <Dashboard filtered={filtered} yearly={yearly} byCrop={byCrop} total={total} countries={countries} years={years} latestYear={latestYear} firstYear={firstYear} growth={growth} concentration={concentration} loading={loading} />}
+        {section === "Data import" ? <ImportPanel upload={upload} message={uploadMessage} rowCount={rows.length} source={dataSource} /> : section === "Methodology" ? <Methodology rows={rows} filtered={filtered} source={dataSource} lastUpdated={lastUpdated} quality={quality} /> : section === "Forecasting" ? <Forecast yearly={yearly} /> : section === "KPI evaluation" ? <Kpi filtered={filtered} total={total} growth={growth} concentration={concentration} targetGrowth={targetGrowth} setTargetGrowth={setTargetGrowth} /> : section === "Recommendations" ? <Recommendations filtered={filtered} growth={growth} concentration={concentration} targetGrowth={targetGrowth} crop={byCrop[0]?.name} /> : section === "Visualizations" ? <Visualizations filtered={filtered} byCrop={byCrop} chartType={visualChart} setChartType={setVisualChart} loading={loading} /> : section === "Weather" ? <WeatherPanel city={weatherCity} setCity={setWeatherCity} weather={weather} error={weatherError} load={loadWeather} /> : section === "Financials" ? <FinancialPanel filtered={filtered} total={total} /> : section === "Reports" ? <ReportsPanel downloadReport={downloadReport} downloadCsv={downloadCsv} /> : section === "Crop health" ? <DiseasePanel image={diseaseImage} setImage={setDiseaseImage} /> : section === "Market prices" ? <MarketPanel records={market} error={marketError} load={loadMarket} /> : <Dashboard filtered={filtered} yearly={yearly} byCrop={byCrop} total={total} countries={countries} years={years} latestYear={latestYear} firstYear={firstYear} growth={growth} concentration={concentration} loading={loading} />}
       </div>
     </main>
   </div>;
+}
+
+function WeatherPanel({ city, setCity, weather, error, load }: { city: string; setCity: (value: string) => void; weather: { location: string; updated: string; current: { temperature: number; condition: string; humidity: number; rainfall: number; wind: number }; forecast: { date: string; temperature: number; rainfall: number; condition: string }[] } | null; error: string; load: () => void }) {
+  return <div className="panel-stack"><section className="visual-hero"><div><p className="eyebrow">FIELD CONDITIONS</p><h2>Weather intelligence for your farm</h2><p>Connect WeatherAPI to bring current conditions and a five-day forecast into your decisions.</p></div><div className="weather-search"><input value={city} onChange={(event) => setCity(event.target.value)} placeholder="City or farm location" /><button onClick={load}>Check weather</button></div></section>{error && <div className="alert error">{error}</div>}{weather ? <><div className="kpi-grid"><KpiCard label="Temperature" value={`${weather.current.temperature}°C`} detail={weather.current.condition} /><KpiCard label="Humidity" value={`${weather.current.humidity}%`} detail="Current relative humidity" /><KpiCard label="Rainfall" value={`${weather.current.rainfall} mm`} detail="Current precipitation" /><KpiCard label="Wind" value={`${weather.current.wind} kph`} detail={weather.location} /></div><section className="card table-card"><div className="card-heading"><div><h2>Five-day outlook</h2><p>Updated {weather.updated}</p></div></div><div className="table-wrap"><table><thead><tr><th>Date</th><th>Condition</th><th>Temperature</th><th>Rainfall</th></tr></thead><tbody>{weather.forecast.map((day) => <tr key={day.date}><td>{day.date}</td><td>{day.condition}</td><td>{day.temperature}°C</td><td>{day.rainfall} mm</td></tr>)}</tbody></table></div></section></> : <div className="card loading-card">Enter a location and check weather to load live conditions.</div>}</div>;
+}
+
+function FinancialPanel({ filtered, total }: { filtered: Row[]; total: number }) {
+  const revenue = filtered.reduce((sum, row) => sum + (row.revenue ?? (row.quantity_sold && row.selling_price ? row.quantity_sold * row.selling_price : 0)), 0);
+  const costs = filtered.reduce((sum, row) => sum + (row.total_cost ?? 0), 0);
+  const profit = revenue - costs;
+  return <div className="panel-stack"><section className="section-intro"><span className="section-icon"><WalletCards size={20} /></span><div><p className="eyebrow">FINANCIAL INTELLIGENCE</p><h2>Understand what each harvest returns</h2><p>These figures use revenue, quantity × price, and cost columns in the active dataset.</p></div></section><div className="kpi-grid"><KpiCard label="Production" value={`${formatNumber(total)} t`} detail={`${filtered.length} selected records`} /><KpiCard label="Revenue" value={revenue ? formatNumber(revenue) : "Not available"} detail="From uploaded financial fields" /><KpiCard label="Total costs" value={costs ? formatNumber(costs) : "Not available"} detail="From total cost fields" /><KpiCard label="Estimated profit" value={revenue ? formatNumber(profit) : "Not available"} detail="Revenue minus costs" /></div><section className="card limitation"><b>Data requirement</b><p>Upload Revenue, Quantity_Sold, Selling_Price, and Total_Cost columns to unlock accurate farm profitability analysis.</p></section></div>;
+}
+
+function ReportsPanel({ downloadReport, downloadCsv }: { downloadReport: () => void; downloadCsv: () => void }) {
+  return <div className="panel-stack"><section className="visual-hero"><div><p className="eyebrow">DECISION PACK</p><h2>Take your analysis with you</h2><p>Export the active filtered view for field reviews, presentations, and record keeping.</p></div></section><div className="two-col"><section className="card import-card"><FileText size={30} color="#16734f" /><h2>Printable PDF report</h2><p>Generate a clean report file, then use your browser’s Print → Save as PDF.</p><button className="upload-button" onClick={() => { downloadReport(); window.print(); }}>Print / Save PDF</button></section><section className="card import-card"><CloudDownload size={30} color="#16734f" /><h2>Excel-compatible export</h2><p>Download the filtered production dataset as a CSV that opens directly in Excel.</p><button className="upload-button" onClick={downloadCsv}>Download CSV</button></section></div></div>;
+}
+
+function DiseasePanel({ image, setImage }: { image: string; setImage: (value: string) => void }) {
+  return <div className="panel-stack"><section className="section-intro"><span className="section-icon"><Stethoscope size={20} /></span><div><p className="eyebrow">CROP HEALTH LAB</p><h2>Screen a crop image</h2><p>Upload a clear leaf photo for the first local screening workflow. Connect a trained model later for production-grade diagnosis.</p></div></section><section className="card import-card"><label className="upload-button"><Upload size={17} /> Upload crop image<input type="file" accept="image/*" onChange={(event) => { const file = event.target.files?.[0]; if (file) setImage(URL.createObjectURL(file)); }} /></label>{image && <><img className="disease-preview" src={image} alt="Uploaded crop sample" /><div className="alert success">Image received. Preliminary screen: review for visible leaf discoloration, spots, and pest damage before taking action.</div></>}</section></div>;
+}
+
+function MarketPanel({ records, error, load }: { records: { commodity: string; year: string; price: string; unit: string }[]; error: string; load: () => void }) {
+  return <div className="panel-stack"><section className="visual-hero"><div><p className="eyebrow">MARKET INTELLIGENCE</p><h2>Track producer price signals</h2><p>FAOSTAT provides free official producer-price data for global comparisons.</p></div><button className="chart-switcher-button" onClick={load}>Refresh prices</button></section>{error && <div className="alert error">{error}</div>}{records.length ? <section className="card table-card"><div className="table-wrap"><table><thead><tr><th>Commodity</th><th>Year</th><th>Price</th><th>Unit</th></tr></thead><tbody>{records.map((record, index) => <tr key={`${record.commodity}-${record.year}-${index}`}><td>{record.commodity}</td><td>{record.year}</td><td>{record.price}</td><td>{record.unit}</td></tr>)}</tbody></table></div></section> : <div className="card loading-card">Refresh prices to load the latest available FAOSTAT producer-price records.</div>}</div>;
 }
 
 function AuthScreen({

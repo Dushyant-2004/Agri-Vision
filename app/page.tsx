@@ -5,7 +5,7 @@ import Papa from "papaparse";
 import {
   BarChart3, BookOpen, ChevronRight, CloudDownload, Database, FileUp,
   Gauge, LayoutDashboard, Lightbulb, Menu, Search, Settings2, Sprout,
-  TrendingUp, Upload, X
+  TrendingUp, Upload, UserCircle, LogOut, ChevronDown, X
 } from "lucide-react";
 import {
   Bar, BarChart, CartesianGrid, Line, LineChart, ResponsiveContainer,
@@ -20,7 +20,15 @@ type Row = {
   rainfall?: number; temperature?: number; drought_index?: number;
   flood_events?: number; heatwave_days?: number;
 };
+type DataQuality = {
+  records_before: number;
+  records_after: number;
+  missing_rows_removed: number;
+  invalid_numeric_or_negative_removed: number;
+  duplicate_rows_removed: number;
+};
 type Section = "Overview" | "Data import" | "Visualizations" | "Forecasting" | "KPI evaluation" | "Recommendations" | "Methodology";
+type AuthMode = "login" | "signup";
 
 const SOURCES = [
   { crop: "Rice", slug: "rice-production.csv" },
@@ -54,6 +62,14 @@ function formatNumber(n: number) {
 }
 
 export default function Home() {
+  const [authenticated, setAuthenticated] = useState(false);
+  const [authMode, setAuthMode] = useState<AuthMode>("signup");
+  const [authName, setAuthName] = useState("");
+  const [authEmail, setAuthEmail] = useState("");
+  const [authPassword, setAuthPassword] = useState("");
+  const [authError, setAuthError] = useState("");
+  const [authNotice, setAuthNotice] = useState("");
+  const [profileOpen, setProfileOpen] = useState(false);
   const [section, setSection] = useState<Section>("Overview");
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
@@ -64,10 +80,19 @@ export default function Home() {
   const [targetGrowth, setTargetGrowth] = useState(5);
   const [uploadMessage, setUploadMessage] = useState("");
   const [dataSource, setDataSource] = useState("OWID / FAOSTAT");
+  const [quality, setQuality] = useState<DataQuality>({
+    records_before: 0, records_after: 0, missing_rows_removed: 0,
+    invalid_numeric_or_negative_removed: 0, duplicate_rows_removed: 0
+  });
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [visualChart, setVisualChart] = useState<"line" | "bar" | "histogram">("line");
 
   useEffect(() => {
+    if (!authenticated) {
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
     Promise.all(SOURCES.map(async (source) => {
       const response = await fetch(DATA_BASE + source.slug);
       if (!response.ok) throw new Error(`Could not download ${source.crop} data`);
@@ -78,7 +103,40 @@ export default function Home() {
     })
       .catch((e: Error) => setError(e.message))
       .finally(() => setLoading(false));
-  }, []);
+  }, [authenticated]);
+
+  function submitAuth(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (authMode === "signup" && !authName.trim()) {
+      setAuthError("Please enter your name to create your workspace.");
+      return;
+    }
+    if (!authEmail.includes("@")) {
+      setAuthError("Please enter a valid email address.");
+      return;
+    }
+    if (authPassword.length < 6) {
+      setAuthError("Use a password with at least 6 characters.");
+      return;
+    }
+    if (authMode === "signup") {
+      setAuthMode("login");
+      setAuthPassword("");
+      setAuthError("");
+      setAuthNotice("Your account is ready. Log in to open your AgriVision workspace.");
+      return;
+    }
+    setAuthError("");
+    setAuthNotice("");
+    setAuthenticated(true);
+  }
+
+  function logout() {
+    setAuthenticated(false);
+    setProfileOpen(false);
+    setAuthPassword("");
+    setAuthError("");
+  }
 
   const countries = useMemo(() => Array.from(new Set(rows.map((r) => r.country))).sort(), [rows]);
   const crops = useMemo(() => Array.from(new Set(rows.map((r) => r.crop))).sort(), [rows]);
@@ -103,6 +161,22 @@ export default function Home() {
     ? ((yearly.at(-1)!.production - yearly[0].production) / yearly[0].production) * 100 : 0;
   const concentration = total ? ((byCrop[0]?.production ?? 0) / total) * 100 : 0;
 
+  if (!authenticated) {
+    return <AuthScreen
+      mode={authMode}
+      name={authName}
+      email={authEmail}
+      password={authPassword}
+      error={authError}
+      notice={authNotice}
+      onModeChange={(mode) => { setAuthMode(mode); setAuthError(""); setAuthNotice(""); }}
+      onNameChange={setAuthName}
+      onEmailChange={setAuthEmail}
+      onPasswordChange={setAuthPassword}
+      onSubmit={submitAuth}
+    />;
+  }
+
   async function upload(file: File) {
     const form = new FormData();
     form.append("file", file);
@@ -112,13 +186,15 @@ export default function Home() {
         const detail = await response.json().catch(() => ({}));
         throw new Error(detail.detail ?? "The Python data service rejected this CSV.");
       }
-      const result = await response.json() as { records: Row[]; source: string; quality: { records_after: number } };
+
+      const result = await response.json() as { records: Row[]; source: string; quality: DataQuality };
       const imported = result.records;
       setRows(imported);
       setCountry(imported[0].country);
       setCrop("All crops");
       setYear("All years");
       setDataSource(result.source);
+      setQuality(result.quality);
       setLastUpdated(new Date());
       setUploadMessage(`Python analytics cleaned ${result.quality.records_after} valid rows and refreshed all charts.`);
       return;
@@ -146,6 +222,13 @@ export default function Home() {
         setCrop("All crops");
         setYear("All years");
         setDataSource(`Uploaded CSV · ${file.name}`);
+        setQuality({
+          records_before: result.data.length,
+          records_after: imported.length,
+          missing_rows_removed: result.data.length - imported.length,
+          invalid_numeric_or_negative_removed: 0,
+          duplicate_rows_removed: 0
+        });
         setLastUpdated(new Date());
         setUploadMessage(`Loaded ${imported.length} valid rows and refreshed all charts. Invalid and incomplete records were excluded.`);
       },
@@ -178,14 +261,72 @@ export default function Home() {
       <div className="sidebar-bottom"><div className="data-status"><span className={loading ? "dot loading" : "dot"}></span><div><b>{loading ? "Loading live data" : "Live data connected"}</b><small>Our World in Data · FAOSTAT</small></div></div><div className="profile"><div className="avatar">JA</div><div><b>Junior Analyst</b><small>Internship workspace</small></div></div></div>
     </aside>
     <main className="main">
-      <header className="topbar"><button className="mobile-menu"><Menu size={20} /></button><div className="breadcrumb">Workspace <span>/</span> <b>{section}</b></div><div className="top-actions"><div className="search"><Search size={16} /><input placeholder="Search insights..." /></div><button className="outline-button" onClick={downloadCsv}><CloudDownload size={16} /> Export data</button></div></header>
+      <header className="topbar"><button className="mobile-menu"><Menu size={20} /></button><div className="breadcrumb">Workspace <span>/</span> <b>{section}</b></div><div className="top-actions"><div className="search"><Search size={16} /><input placeholder="Search insights..." /></div><button className="outline-button" onClick={downloadCsv}><CloudDownload size={16} /> Export data</button><div className="profile-menu"><button className="profile-trigger" aria-expanded={profileOpen} onClick={() => setProfileOpen((open) => !open)}><span className="header-avatar"><UserCircle size={19} /></span><span className="profile-trigger-copy"><b>{authName || "Junior Analyst"}</b><small>{authEmail || "Internship workspace"}</small></span><ChevronDown size={15} /></button>{profileOpen && <div className="profile-dropdown"><div className="profile-dropdown-heading"><span className="header-avatar large"><UserCircle size={21} /></span><div><b>{authName || "Junior Analyst"}</b><small>{authEmail || "Internship workspace"}</small></div></div><button className="logout-button" onClick={logout}><LogOut size={16} /> Log out</button></div>}</div></div></header>
       <div className="content">
         {error && <div className="alert error">{error} Check your internet connection and reload.</div>}
         <div className="page-heading"><div><p className="eyebrow">AGRICULTURAL INTELLIGENCE · 2026</p><h1>{section === "Overview" ? "Production overview" : section}</h1><p className="subtitle">{section === "Overview" ? "Turn production data into decisions you can defend." : "Explore the evidence behind your agribusiness decisions."}</p><p className="data-source">Source: <b>{dataSource}</b>{lastUpdated && <> · Updated {lastUpdated.toLocaleTimeString()}</>}</p></div>{section !== "KPI evaluation" && <div className="filters"><label>Country<select value={country} onChange={(e) => setCountry(e.target.value)}><option>All geographies</option>{countries.slice(0, 80).map((c) => <option key={c}>{c}</option>)}</select></label><label>Crop<select value={crop} onChange={(e) => setCrop(e.target.value)}><option>All crops</option>{crops.map((c) => <option key={c}>{c}</option>)}</select></label><label>Year<select value={year} onChange={(e) => setYear(e.target.value)}><option>All years</option>{years.slice(-30).map((y) => <option key={y}>{y}</option>)}</select></label></div>}</div>
-        {section === "Data import" ? <ImportPanel upload={upload} message={uploadMessage} rowCount={rows.length} source={dataSource} /> : section === "Methodology" ? <Methodology rows={rows} filtered={filtered} source={dataSource} lastUpdated={lastUpdated} /> : section === "Forecasting" ? <Forecast yearly={yearly} /> : section === "KPI evaluation" ? <Kpi filtered={filtered} total={total} growth={growth} concentration={concentration} targetGrowth={targetGrowth} setTargetGrowth={setTargetGrowth} /> : section === "Recommendations" ? <Recommendations filtered={filtered} growth={growth} concentration={concentration} targetGrowth={targetGrowth} crop={byCrop[0]?.name} /> : section === "Visualizations" ? <Visualizations filtered={filtered} byCrop={byCrop} chartType={visualChart} setChartType={setVisualChart} loading={loading} /> : <Dashboard filtered={filtered} yearly={yearly} byCrop={byCrop} total={total} countries={countries} years={years} latestYear={latestYear} firstYear={firstYear} growth={growth} concentration={concentration} loading={loading} />}
+        {section === "Data import" ? <ImportPanel upload={upload} message={uploadMessage} rowCount={rows.length} source={dataSource} /> : section === "Methodology" ? <Methodology rows={rows} filtered={filtered} source={dataSource} lastUpdated={lastUpdated} quality={quality} /> : section === "Forecasting" ? <Forecast yearly={yearly} /> : section === "KPI evaluation" ? <Kpi filtered={filtered} total={total} growth={growth} concentration={concentration} targetGrowth={targetGrowth} setTargetGrowth={setTargetGrowth} /> : section === "Recommendations" ? <Recommendations filtered={filtered} growth={growth} concentration={concentration} targetGrowth={targetGrowth} crop={byCrop[0]?.name} /> : section === "Visualizations" ? <Visualizations filtered={filtered} byCrop={byCrop} chartType={visualChart} setChartType={setVisualChart} loading={loading} /> : <Dashboard filtered={filtered} yearly={yearly} byCrop={byCrop} total={total} countries={countries} years={years} latestYear={latestYear} firstYear={firstYear} growth={growth} concentration={concentration} loading={loading} />}
       </div>
     </main>
   </div>;
+}
+
+function AuthScreen({
+  mode, name, email, password, error, onModeChange, onNameChange, onEmailChange,
+  onPasswordChange, onSubmit, notice
+}: {
+  mode: AuthMode;
+  name: string;
+  email: string;
+  password: string;
+  error: string;
+  notice: string;
+  onModeChange: (mode: AuthMode) => void;
+  onNameChange: (value: string) => void;
+  onEmailChange: (value: string) => void;
+  onPasswordChange: (value: string) => void;
+  onSubmit: (event: React.FormEvent<HTMLFormElement>) => void;
+}) {
+  const isSignup = mode === "signup";
+  return <main className="auth-page">
+    <div className="auth-decoration auth-decoration-one" />
+    <div className="auth-decoration auth-decoration-two" />
+    <section className="auth-story">
+      <div className="auth-brand"><span className="auth-brand-mark"><Sprout size={23} /></span><span><b>AgriVision</b><small>AGRIBUSINESS ANALYTICS</small></span></div>
+      <div className="auth-story-copy">
+        <p className="eyebrow">GROW WITH CLARITY</p>
+        <h1>Better harvests start with better decisions.</h1>
+        <p>Turn field data into practical insight with a workspace built for modern agriculture teams.</p>
+      </div>
+      <div className="auth-feature-list">
+        <div><span>01</span><p><b>See the full picture</b><small>Track production trends across every crop and geography.</small></p></div>
+        <div><span>02</span><p><b>Plan with confidence</b><small>Use transparent forecasts and evidence-backed recommendations.</small></p></div>
+      </div>
+      <p className="auth-footnote">“Data is the new soil for sustainable growth.”</p>
+    </section>
+    <section className="auth-panel">
+      <div className="auth-card">
+        <div className="auth-mobile-mark"><Sprout size={22} /></div>
+        <p className="eyebrow">{isSignup ? "JOIN THE WORKSPACE" : "WELCOME BACK"}</p>
+        <h2>{isSignup ? "Create your account" : "Welcome to your farm intelligence"}</h2>
+        <p className="auth-subtitle">{isSignup ? "Set up your free analytics workspace in a few seconds." : "Sign in to continue to your analytics workspace."}</p>
+        <div className="auth-tabs" role="tablist" aria-label="Authentication">
+          <button type="button" className={!isSignup ? "active" : ""} onClick={() => onModeChange("login")}>Log in</button>
+          <button type="button" className={isSignup ? "active" : ""} onClick={() => onModeChange("signup")}>Sign up</button>
+        </div>
+        <form className="auth-form" onSubmit={onSubmit}>
+          {isSignup && <label>Full name<input value={name} onChange={(event) => onNameChange(event.target.value)} placeholder="Your name" autoComplete="name" /></label>}
+          <label>Email address<input type="email" value={email} onChange={(event) => onEmailChange(event.target.value)} placeholder="you@farm.com" autoComplete="email" /></label>
+          <label>Password <span className="auth-label-note">{!isSignup && "Forgot password?"}</span><input type="password" value={password} onChange={(event) => onPasswordChange(event.target.value)} placeholder="At least 6 characters" autoComplete={isSignup ? "new-password" : "current-password"} /></label>
+          {error && <p className="auth-error" role="alert">{error}</p>}
+          {notice && <p className="auth-notice" role="status">{notice}</p>}
+          <button className="auth-submit" type="submit">{isSignup ? "Create workspace" : "Enter AgriVision"} <ChevronRight size={17} /></button>
+        </form>
+        <p className="auth-terms">{isSignup ? "By signing up, you agree to our workspace terms." : "New to AgriVision? Use the Sign up tab to get started."}</p>
+      </div>
+      <p className="auth-copyright">© 2026 AgriVision · Built for people who grow</p>
+    </section>
+  </main>;
 }
 
 function Dashboard({ filtered, yearly, byCrop, total, countries, years, latestYear, firstYear, growth, concentration, loading }: { filtered: Row[]; yearly: { name: number; production: number }[]; byCrop: { name: string; production: number }[]; total: number; countries: string[]; years: number[]; latestYear?: number; firstYear?: number; growth: number; concentration: number; loading: boolean }) {
@@ -257,4 +398,27 @@ function Kpi({ filtered, total, growth, concentration, targetGrowth, setTargetGr
 }
 function MetricStatus({ label, value, status, detail }: { label: string; value: string; status: "available" | "partial" | "not_available"; detail: string }) { return <div className="metric-status"><div><b>{label}</b><span className={`status-pill ${status}`}>{status === "available" ? "Available" : status === "partial" ? "Partial" : "Not available"}</span></div><strong>{value}</strong><small>{detail}</small></div>; }
 function Recommendations({ filtered, growth, concentration, targetGrowth, crop }: { filtered: Row[]; growth: number; concentration: number; targetGrowth: number; crop?: string }) { const revenue = filtered.some((row) => typeof row.revenue === "number") ? filtered.reduce((sum, row) => sum + (row.revenue ?? 0), 0) : filtered.some((row) => typeof row.quantity_sold === "number" && typeof row.selling_price === "number") ? filtered.reduce((sum, row) => sum + (row.quantity_sold ?? 0) * (row.selling_price ?? 0), 0) : null; const costs = filtered.some((row) => typeof row.total_cost === "number") ? filtered.reduce((sum, row) => sum + (row.total_cost ?? 0), 0) : null; const profitMargin = revenue !== null && costs !== null && revenue !== 0 ? ((revenue - costs) / revenue) * 100 : null; const recs = [{ title: growth < targetGrowth ? "Investigate the growth gap" : "Protect the positive growth trend", body: `Observed growth is ${growth.toFixed(1)}% against your configurable ${targetGrowth}% benchmark. Segment the trend by crop and geography before acting.` }, { title: concentration > 60 ? "Review crop concentration risk" : "Maintain a diversified crop mix", body: `${concentration.toFixed(1)}% of selected production comes from ${crop ?? "the leading crop"}. Consider scenario analysis for a crop-specific shock.` }, { title: profitMargin === null ? "Add context before financial decisions" : "Monitor observed profit margin", body: profitMargin === null ? "Upload revenue and total cost fields to calculate profit from the active dataset." : `Calculated profit margin is ${profitMargin.toFixed(1)}% from the uploaded revenue and cost fields.`, }]; return <div className="recommendations"><div className="section-intro"><span className="section-icon"><Lightbulb size={20} /></span><div><p className="eyebrow">EVIDENCE-BASED ACTIONS</p><h2>Recommendations from your active data</h2><p>These rules recalculate whenever you upload a CSV or change the filters.</p></div></div>{recs.map((r, i) => <section className="card recommendation" key={r.title}><div className="rec-number">0{i + 1}</div><div><h2>{r.title}</h2><p>{r.body}</p><small>Rule-based · evidence linked · not a guarantee</small></div></section>)}</div>; }
-function Methodology({ rows, filtered, source, lastUpdated }: { rows: Row[]; filtered: Row[]; source: string; lastUpdated: Date | null }) { const crops = new Set(filtered.map((r) => r.crop)).size; const geographies = new Set(filtered.map((r) => r.country)).size; const years = filtered.length ? `${Math.min(...filtered.map((r) => r.year))}–${Math.max(...filtered.map((r) => r.year))}` : "No years"; return <div className="method-grid"><div className="section-intro"><span className="section-icon"><BookOpen size={20} /></span><div><p className="eyebrow">TRANSPARENT ANALYTICS</p><h2>How this analysis was produced</h2><p>The methodology below is generated from the active dataset, not placeholder text.</p></div></div><section className="card"><p className="eyebrow">ACTIVE DATASET</p><h2>{source}</h2><div className="method-stat-grid"><b>{rows.length.toLocaleString()}<small>active rows</small></b><b>{filtered.length.toLocaleString()}<small>filtered rows</small></b><b>{crops}<small>crop categories</small></b><b>{geographies}<small>geographies</small></b></div><p>Coverage: <b>{years}</b>{lastUpdated && <> · loaded {lastUpdated.toLocaleTimeString()}</>}</p></section><section className="card"><p className="eyebrow">CALCULATIONS</p><h2>What is calculated</h2><ul><li>Trend: annual production totals from the active filter context.</li><li>Growth: change between the first and latest available year.</li><li>Concentration: leading crop divided by total production.</li><li>Forecast: five-year moving-average baseline.</li><li>Cleaning: schema, numeric, non-negative, and missing-value checks.</li></ul></section><section className="card"><p className="eyebrow">SOURCE & LIMITATIONS</p><h2>Interpret results carefully</h2><p>{source.startsWith("Uploaded") ? "This analysis uses your uploaded CSV. Confirm its provenance, units, collection period, and definitions before presenting it as official data." : "The default series is accessed through the Our World in Data Grapher and documents FAOSTAT as the underlying source. OWID is a third-party mirror, not the FAO application."}</p><p>Production observations alone cannot explain profitability, sustainability, yield, or causality. Forecasts are estimates, never guarantees.</p><a href="https://ourworldindata.org/agricultural-production" target="_blank">Read source documentation ↗</a></section></div>; }
+function Methodology({ rows, filtered, source, lastUpdated, quality }: { rows: Row[]; filtered: Row[]; source: string; lastUpdated: Date | null; quality: DataQuality }) {
+  const crops = new Set(filtered.map((r) => r.crop)).size;
+  const geographies = new Set(filtered.map((r) => r.country)).size;
+  const years = filtered.length ? `${Math.min(...filtered.map((r) => r.year))}–${Math.max(...filtered.map((r) => r.year))}` : "No years";
+  const available = (fields: (keyof Row)[]) => fields.some((field) => filtered.some((row) => typeof row[field] === "number"));
+  const yearly = Array.from(filtered.reduce((map, row) => map.set(row.year, (map.get(row.year) ?? 0) + row.production), new Map<number, number>()), ([year, production]) => ({ year, production })).sort((a, b) => a.year - b.year);
+  const window = yearly.slice(-5);
+  const baseline = window.length ? window.reduce((sum, row) => sum + row.production, 0) / window.length : 0;
+  const holdout = yearly.length >= 4 ? yearly.slice(-Math.min(3, Math.floor(yearly.length / 4))) : [];
+  const holdoutAverage = holdout.length ? holdout.reduce((sum, row) => sum + row.production, 0) / holdout.length : null;
+  const errorPercent = holdoutAverage && holdoutAverage !== 0 ? Math.abs(baseline - holdoutAverage) / holdoutAverage * 100 : null;
+  const status = (isAvailable: boolean) => isAvailable ? "Available" : "Not available";
+  const revenueAvailable = available(["revenue"]) || (available(["quantity_sold"]) && available(["selling_price"]));
+  const profitAvailable = revenueAvailable && available(["total_cost"]);
+  return <div className="method-grid">
+    <div className="section-intro"><span className="section-icon"><BookOpen size={20} /></span><div><p className="eyebrow">TRANSPARENT ANALYTICS</p><h2>How this analysis was produced</h2><p>This page describes the exact active dataset, validation rules, formulas, and model assumptions behind Agri Vision.</p></div></div>
+    <section className="card"><p className="eyebrow">ACTIVE DATASET</p><h2>{source}</h2><div className="method-stat-grid"><b>{rows.length.toLocaleString()}<small>active rows</small></b><b>{filtered.length.toLocaleString()}<small>filtered rows</small></b><b>{crops}<small>crop categories</small></b><b>{geographies}<small>geographies</small></b></div><p>Coverage: <b>{years}</b>{lastUpdated && <> · loaded {lastUpdated.toLocaleTimeString()}</>}</p><p>Unit: <b>tonnes</b> unless an uploaded file defines another unit. Current filters are applied to every trend, KPI, and forecast calculation.</p></section>
+    <section className="card"><p className="eyebrow">DATA QUALITY</p><h2>What passed the quality gate</h2><div className="method-quality-grid"><span>Rows received <b>{(quality.records_before || rows.length).toLocaleString()}</b></span><span>Rows retained <b>{(quality.records_after || rows.length).toLocaleString()}</b></span><span>Missing/malformed <b>{quality.missing_rows_removed.toLocaleString()}</b></span><span>Negative values <b>{quality.invalid_numeric_or_negative_removed.toLocaleString()}</b></span><span>Duplicates <b>{quality.duplicate_rows_removed.toLocaleString()}</b></span></div><p>Required fields are Year and Production. Values are converted to numbers; incomplete, invalid, negative, and duplicate records are excluded before analysis.</p></section>
+    <section className="card"><p className="eyebrow">CALCULATIONS & FORMULAS</p><h2>What is calculated</h2><ul><li><b>Annual trend:</b> sum of production grouped by year.</li><li><b>Growth:</b> ((latest annual total − first annual total) ÷ first total) × 100.</li><li><b>Concentration:</b> leading crop production ÷ total production × 100.</li><li><b>Yield:</b> production ÷ positive cultivated area, when area is supplied.</li><li><b>Revenue:</b> revenue column, or quantity sold × selling price.</li></ul></section>
+    <section className="card"><p className="eyebrow">FORECAST VALIDATION</p><h2>How the baseline is tested</h2><p>The forecast repeats the average production from the latest {window.length || 5} available years for the next three years.</p><div className="method-stat-grid"><b>{formatNumber(baseline)}<small>forecast baseline (t)</small></b><b>{holdout.length ? `${errorPercent?.toFixed(1)}%` : "—"}<small>holdout error (MAPE-like)</small></b><b>{yearly.length}<small>annual observations</small></b><b>{holdout.length || 0}<small>validation years</small></b></div><p>{holdout.length ? "The latest historical observations are compared with the baseline as a simple chronological check. Lower error is better." : "At least four annual observations are needed before a chronological holdout check can be shown."}</p></section>
+    <section className="card"><p className="eyebrow">KPI INPUT AVAILABILITY</p><h2>Which decisions the data supports</h2><div className="method-availability"><span>Yield <b>{status(available(["area"]))}</b><small>Production + area</small></span><span>Revenue <b>{status(revenueAvailable)}</b><small>Revenue or quantity × price</small></span><span>Profit <b>{status(profitAvailable)}</b><small>Revenue + total costs</small></span><span>Weather risk <b>{status(available(["rainfall", "temperature", "drought_index", "flood_events", "heatwave_days"]))}</b><small>Weather observations</small></span></div></section>
+    <section className="card"><p className="eyebrow">SOURCE & LIMITATIONS</p><h2>Interpret results carefully</h2><p>{source.startsWith("Uploaded") ? "This analysis uses your uploaded CSV. Confirm its provenance, collection period, definitions, and units before presenting it as official data." : "The default series is accessed through the Our World in Data Grapher and documents FAOSTAT as the underlying source. OWID is a third-party mirror, not the FAO application."}</p><p>Production observations alone cannot explain profitability, sustainability, yield, or causality. Forecasts are baseline estimates, not guarantees, and do not model weather, prices, policy, area changes, or unexpected shocks.</p><a href="https://ourworldindata.org/agricultural-production" target="_blank" rel="noreferrer">Read source documentation ↗</a></section>
+  </div>;
+}

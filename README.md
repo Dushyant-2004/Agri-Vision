@@ -145,6 +145,18 @@ Forecasting uses a transparent five-year moving-average baseline. It is not a ca
 
 Profit requires revenue and total cost. Yield requires production and positive cultivated area. Sustainability and weather-risk statuses depend on the corresponding uploaded fields. These metrics are intentionally not estimated when their required inputs are missing.
 
+The in-app Methodology page reports the active source, filter context, row coverage, units, data-quality results, formulas, forecast baseline, and KPI input availability. The quality gate requires `Year` and `Production`, converts numeric values, and excludes incomplete, malformed, negative, and duplicate records. For uploaded CSVs it also reports rows received, rows retained, and each removal category.
+
+The main formulas are:
+
+- Annual trend: sum of production grouped by year.
+- Growth: `((latest annual total - first annual total) / first annual total) * 100`.
+- Crop concentration: `leading crop production / total production * 100`.
+- Yield: `production / positive cultivated area`, when `area` is provided.
+- Revenue: `revenue`, or `quantity_sold * selling_price` when both inputs are available.
+
+Forecasts repeat the average production from the latest five available years for the next three years. When enough annual observations exist, the latest historical observations are held out for a chronological baseline check and reported as a percentage error. This is a diagnostic estimate, not a confidence interval or causal forecast.
+
 ## Project structure
 
 ```text

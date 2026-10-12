@@ -1,15 +1,57 @@
 from __future__ import annotations
 
+from collections import defaultdict
+from datetime import datetime, timezone
 from io import BytesIO
-from typing import Annotated
+from typing import Any, Annotated
 
 import httpx
 import pandas as pd
 import os
+from pathlib import Path
 from fastapi import FastAPI, File, HTTPException, Query, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 
 from .analytics import clean_csv, filter_frame, forecast, kpis, recommendations, summary, trends
+
+COUNTRY_NAMES = {
+    "afghanistan": "AF", "australia": "AU", "bangladesh": "BD", "brazil": "BR",
+    "canada": "CA", "china": "CN", "egypt": "EG", "france": "FR", "germany": "DE",
+    "india": "IN", "indonesia": "ID", "italy": "IT", "japan": "JP", "mexico": "MX",
+    "nepal": "NP", "pakistan": "PK", "russia": "RU", "singapore": "SG",
+    "south africa": "ZA", "spain": "ES", "sri lanka": "LK", "uae": "AE",
+    "united arab emirates": "AE", "united kingdom": "GB", "united states": "US",
+    "usa": "US", "vietnam": "VN",
+}
+COUNTRY_CENTROIDS = {
+    "AU": (-25.2744, 133.7751), "BD": (23.6850, 90.3563), "BR": (-14.2350, -51.9253),
+    "CA": (56.1304, -106.3468), "CN": (35.8617, 104.1954), "DE": (51.1657, 10.4515),
+    "EG": (26.8206, 30.8025), "FR": (46.2276, 2.2137), "GB": (55.3781, -3.4360),
+    "IN": (20.5937, 78.9629), "ID": (-0.7893, 113.9213), "IT": (41.8719, 12.5674),
+    "JP": (36.2048, 138.2529), "MX": (23.6345, -102.5528), "NP": (28.3949, 84.1240),
+    "PK": (30.3753, 69.3451), "RU": (61.5240, 105.3188), "SG": (1.3521, 103.8198),
+    "ZA": (-30.5595, 22.9375), "ES": (40.4637, -3.7492), "LK": (7.8731, 80.7718),
+    "AE": (23.4241, 53.8478), "US": (37.0902, -95.7129), "VN": (14.0583, 108.2772),
+}
+
+
+def load_local_environment() -> None:
+    """Load simple KEY=value settings from the ignored local backend .env file."""
+    env_path = Path(__file__).resolve().parents[1] / ".env"
+    if not env_path.exists():
+        return
+    for raw_line in env_path.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        name, value = line.split("=", 1)
+        name = name.strip()
+        value = value.strip().strip("\"'")
+        if name:
+            os.environ.setdefault(name, value)
+
+
+load_local_environment()
 
 app = FastAPI(title="AgriVision Analytics API", version="1.0.0")
 app.add_middleware(
@@ -162,40 +204,102 @@ async def methodology() -> dict:
 
 @app.get("/api/weather")
 async def weather(city: str = Query(default="New Delhi", min_length=1)) -> dict:
-    api_key = os.getenv("WEATHER_API_KEY")
+    api_key = os.getenv("OPENWEATHER_API_KEY")
     if not api_key:
-        raise HTTPException(status_code=503, detail="WEATHER_API_KEY is not configured.")
+        raise HTTPException(status_code=503, detail="OPENWEATHER_API_KEY is not configured.")
     try:
         async with httpx.AsyncClient(timeout=15) as client:
-            response = await client.get(
-                "https://api.weatherapi.com/v1/forecast.json",
-                params={"key": api_key, "q": city, "days": 5, "aqi": "no", "alerts": "yes"},
+            search = city.strip()
+            country_code = COUNTRY_NAMES.get(search.casefold())
+            geocode_response = await client.get(
+                "https://api.openweathermap.org/geo/1.0/direct",
+                params={
+                    "q": search,
+                    "limit": 5,
+                    "appid": api_key,
+                },
             )
-            response.raise_for_status()
-            payload = response.json()
+            geocode_response.raise_for_status()
+            locations = geocode_response.json()
+            if not locations:
+                raise HTTPException(status_code=404, detail=f"Could not locate {search}.")
+            location = next(
+                (
+                    item
+                    for item in locations
+                    if country_code and item.get("country") == country_code
+                    and item.get("name", "").casefold() == search.casefold()
+                ),
+                locations[0],
+            )
+            latitude, longitude = COUNTRY_CENTROIDS.get(
+                country_code, (float(location["lat"]), float(location["lon"]))
+            )
+            current_response = await client.get(
+                "https://api.openweathermap.org/data/2.5/weather",
+                params={"lat": latitude, "lon": longitude, "appid": api_key, "units": "metric"},
+            )
+            current_response.raise_for_status()
+            current_payload = current_response.json()
+            forecast_response = await client.get(
+                "https://api.openweathermap.org/data/2.5/forecast",
+                params={"lat": latitude, "lon": longitude, "appid": api_key, "units": "metric", "cnt": 40},
+            )
+            forecast_response.raise_for_status()
+            forecast_payload = forecast_response.json()
     except (httpx.HTTPError, ValueError) as error:
-        raise HTTPException(status_code=502, detail="WeatherAPI could not return weather for this location.") from error
-    location = payload["location"]
-    current = payload["current"]
+        raise HTTPException(status_code=502, detail="OpenWeather could not return weather for this location.") from error
+
+    daily: dict[str, dict[str, Any]] = defaultdict(
+        lambda: {"temperatures": [], "rainfall": 0.0, "conditions": []}
+    )
+    for item in forecast_payload.get("list", []):
+        date = item["dt_txt"].split(" ")[0]
+        day = daily[date]
+        day["temperatures"].append(float(item["main"]["temp"]))
+        day["rainfall"] += float(item.get("rain", {}).get("3h", 0.0))
+        day["conditions"].append(item["weather"][0]["description"].capitalize())
+
+    forecast = [
+        {
+            "date": date,
+            "temperature": round(sum(day["temperatures"]) / len(day["temperatures"]), 1),
+            "rainfall": round(day["rainfall"], 1),
+            "condition": max(set(day["conditions"]), key=day["conditions"].count),
+        }
+        for date, day in sorted(daily.items())[:5]
+    ]
+    current = current_payload["main"]
+    display_location = (
+        f"{search.title()}, {country_code}"
+        if country_code
+        else f"{current_payload['name']}, {current_payload['sys']['country']}"
+    )
     return {
-        "location": f"{location['name']}, {location['country']}",
-        "updated": current["last_updated"],
-        "current": {
-            "temperature": current["temp_c"],
-            "condition": current["condition"]["text"],
-            "humidity": current["humidity"],
-            "rainfall": current["precip_mm"],
-            "wind": current["wind_kph"],
+        "location": display_location,
+        "coordinates": {
+            "latitude": round(latitude, 4),
+            "longitude": round(longitude, 4),
         },
-        "forecast": [
-            {
-                "date": day["date"],
-                "temperature": day["day"]["avgtemp_c"],
-                "rainfall": day["day"]["totalprecip_mm"],
-                "condition": day["day"]["condition"]["text"],
-            }
-            for day in payload["forecast"]["forecastday"]
-        ],
+        "updated": datetime.fromtimestamp(
+            current_payload["dt"], tz=timezone.utc
+        ).isoformat(),
+        "current": {
+            "temperature": round(float(current["temp"]), 1),
+            "feels_like": round(float(current["feels_like"]), 1),
+            "condition": current_payload["weather"][0]["description"].capitalize(),
+            "humidity": current["humidity"],
+            "pressure": current["pressure"],
+            "visibility": round(float(current_payload.get("visibility", 0)) / 1000, 1),
+            "clouds": current_payload.get("clouds", {}).get("all", 0),
+            "rainfall": round(
+                float(current_payload.get("rain", {}).get("1h", 0.0)), 1
+            ),
+            "wind": round(float(current_payload.get("wind", {}).get("speed", 0.0)) * 3.6, 1),
+        },
+        "sunrise": current_payload["sys"]["sunrise"],
+        "sunset": current_payload["sys"]["sunset"],
+        "forecast": forecast,
     }
 
 

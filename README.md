@@ -12,7 +12,7 @@ AgriVision is an internship portfolio project that converts crop-production data
 - KPI evaluation for production, growth, concentration, yield, revenue, costs, profit, farmer income, water productivity, sustainability, and weather-risk availability.
 - Rule-based recommendations linked to the active dataset.
 - Methodology and data-source documentation inside the dashboard.
-- Weather workspace powered by WeatherAPI.com when `WEATHER_API_KEY` is configured.
+- Weather workspace powered by OpenWeather when `OPENWEATHER_API_KEY` is configured.
 - Financial, report export, crop-health upload, and FAOSTAT market-price workspaces.
 
 ## Technology
@@ -65,10 +65,10 @@ Open the interactive API documentation at http://127.0.0.1:8000/docs.
 
 The frontend uses `http://127.0.0.1:8000` by default. To use another API URL, copy `.env.example` to `.env.local` and set `NEXT_PUBLIC_API_URL`. If the backend is unavailable, the frontend uses its local CSV validation fallback.
 
-For live weather, set `WEATHER_API_KEY` in the backend environment. The key is not committed to the repository:
+For live weather, set `OPENWEATHER_API_KEY` in `backend/.env`. This file is ignored by Git and loaded automatically by the backend. Keep the key backend-only; do not expose it as a `NEXT_PUBLIC_` variable or commit it to the repository:
 
 ```powershell
-$env:WEATHER_API_KEY = "your-weatherapi-key"
+Set-Content -Path "backend\.env" -Value 'OPENWEATHER_API_KEY=your-openweather-api-key'
 ```
 
 The market-price workspace uses the public FAOSTAT producer-price endpoint and may be unavailable when FAOSTAT is rate-limited. Crop health currently provides the image-upload and review workflow; connect a trained model before treating its screening text as a diagnosis.

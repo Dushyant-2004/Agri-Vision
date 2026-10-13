@@ -313,19 +313,54 @@ async def market_prices() -> dict:
             )
             response.raise_for_status()
             payload = response.json()
-    except (httpx.HTTPError, ValueError) as error:
-        raise HTTPException(status_code=502, detail="FAOSTAT market data is temporarily unavailable.") from error
-    records = payload.get("data", [])
-    return {
-        "source": "FAOSTAT · Producer Prices",
-        "records": [
-            {
-                "commodity": row.get("Item"),
-                "year": row.get("Year"),
-                "price": row.get("Value"),
-                "unit": row.get("Unit"),
+        records = payload.get("data", [])
+        return {
+            "source": "FAOSTAT · Producer Prices",
+            "records": [
+                {
+                    "commodity": row.get("Item"),
+                    "year": row.get("Year"),
+                    "price": row.get("Value"),
+                    "unit": row.get("Unit"),
+                }
+                for row in records[:20]
+                if row.get("Item") and row.get("Value") is not None
+            ],
+        }
+    except (httpx.HTTPError, ValueError):
+        # FAOSTAT's public API is intermittently unavailable. DBnomics keeps
+        # an indexed FAOSTAT catalog that lets the market workspace remain
+        # informative without presenting made-up prices.
+        try:
+            async with httpx.AsyncClient(timeout=15) as client:
+                fallback_response = await client.get(
+                    "https://api.db.nomics.world/v22/series/FAO/PP",
+                    params={"q": "India", "limit": 20},
+                )
+                fallback_response.raise_for_status()
+                fallback_payload = fallback_response.json()
+            fallback_records = []
+            for series in fallback_payload.get("series", {}).get("docs", []):
+                name = str(series.get("series_name", ""))
+                parts = [part.strip() for part in name.split("–")]
+                commodity = parts[-1] if parts else name
+                unit = parts[0].replace("Producer Price", "").strip(" ()") if parts else ""
+                if commodity:
+                    fallback_records.append(
+                        {
+                            "commodity": commodity,
+                            "year": "Catalog",
+                            "price": "Unavailable",
+                            "unit": unit or "FAOSTAT series",
+                        }
+                    )
+            return {
+                "source": "FAOSTAT catalog · DBnomics fallback",
+                "notice": "Live FAOSTAT price values are temporarily unavailable. Showing the indexed commodity catalog.",
+                "records": fallback_records,
             }
-            for row in records[:20]
-            if row.get("Item") and row.get("Value") is not None
-        ],
-    }
+        except (httpx.HTTPError, ValueError, TypeError):
+            raise HTTPException(
+                status_code=503,
+                detail="Market-price providers are temporarily unavailable. Please try again shortly.",
+            ) from None

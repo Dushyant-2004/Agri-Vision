@@ -1,10 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Papa from "papaparse";
-import { geoGraticule10, geoOrthographic, geoPath } from "d3-geo";
-import { feature } from "topojson-client";
-import world from "world-atlas/land-110m.json";
+import dynamic from "next/dynamic";
 import {
   BarChart3, BookOpen, ChevronRight, CloudDownload, Database, FileUp,
   Gauge, LayoutDashboard, Lightbulb, Menu, Search, Settings2, Sprout,
@@ -42,6 +40,7 @@ const SOURCES = [
 ];
 const DATA_BASE = "https://ourworldindata.org/grapher/";
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000";
+const LocationMap = dynamic(() => import("./location-map"), { ssr: false });
 
 function parseOwid(csv: string, crop: string): Row[] {
   const parsed = Papa.parse<string[]>(csv, { skipEmptyLines: true }).data;
@@ -96,6 +95,7 @@ export default function Home() {
   const [weatherError, setWeatherError] = useState("");
   const [market, setMarket] = useState<{ commodity: string; year: string; price: string; unit: string }[]>([]);
   const [marketError, setMarketError] = useState("");
+  const [marketNotice, setMarketNotice] = useState("");
   const [diseaseImage, setDiseaseImage] = useState("");
 
   useEffect(() => {
@@ -290,11 +290,13 @@ export default function Home() {
 
   async function loadMarket() {
     setMarketError("");
+    setMarketNotice("");
     try {
       const response = await fetch(`${API_BASE}/api/market-prices`);
       const result = await response.json();
       if (!response.ok) throw new Error(result.detail ?? "Market data could not be loaded.");
       setMarket(result.records);
+      setMarketNotice(result.notice ?? "");
     } catch (marketRequestError) {
       setMarketError(marketRequestError instanceof Error ? marketRequestError.message : "Market data could not be loaded.");
     }
@@ -368,7 +370,7 @@ export default function Home() {
       <div className="content">
         {error && <div className="alert error">{error} Check your internet connection and reload.</div>}
         <div className="page-heading"><div><p className="eyebrow">AGRICULTURAL INTELLIGENCE · 2026</p><h1>{section === "Overview" ? "Production overview" : section}</h1><p className="subtitle">{section === "Overview" ? "Turn production data into decisions you can defend." : "Explore the evidence behind your agribusiness decisions."}</p><p className="data-source">Source: <b>{dataSource}</b>{lastUpdated && <> · Updated {lastUpdated.toLocaleTimeString()}</>}</p></div>{section !== "KPI evaluation" && <div className="filters"><label>Country<select value={country} onChange={(e) => setCountry(e.target.value)}><option>All geographies</option>{countries.slice(0, 80).map((c) => <option key={c}>{c}</option>)}</select></label><label>Crop<select value={crop} onChange={(e) => setCrop(e.target.value)}><option>All crops</option>{crops.map((c) => <option key={c}>{c}</option>)}</select></label><label>Year<select value={year} onChange={(e) => setYear(e.target.value)}><option>All years</option>{years.slice(-30).map((y) => <option key={y}>{y}</option>)}</select></label></div>}</div>
-        {section === "Data import" ? <ImportPanel upload={upload} message={uploadMessage} rowCount={rows.length} source={dataSource} /> : section === "Methodology" ? <Methodology rows={rows} filtered={filtered} source={dataSource} lastUpdated={lastUpdated} quality={quality} /> : section === "Forecasting" ? <Forecast yearly={yearly} /> : section === "KPI evaluation" ? <Kpi filtered={filtered} total={total} growth={growth} concentration={concentration} targetGrowth={targetGrowth} setTargetGrowth={setTargetGrowth} /> : section === "Recommendations" ? <Recommendations filtered={filtered} growth={growth} concentration={concentration} targetGrowth={targetGrowth} crop={byCrop[0]?.name} /> : section === "Visualizations" ? <Visualizations filtered={filtered} byCrop={byCrop} chartType={visualChart} setChartType={setVisualChart} loading={loading} /> : section === "Weather" ? <WeatherPanel city={weatherCity} setCity={setWeatherCity} weather={weather} error={weatherError} load={loadWeather} /> : section === "Financials" ? <FinancialPanel filtered={filtered} total={total} /> : section === "Reports" ? <ReportsPanel printReport={printReport} downloadCsv={downloadCsv} /> : section === "Crop health" ? <DiseasePanel image={diseaseImage} setImage={setDiseaseImage} /> : section === "Market prices" ? <MarketPanel records={market} error={marketError} load={loadMarket} /> : <Dashboard filtered={filtered} yearly={yearly} byCrop={byCrop} total={total} countries={countries} years={years} latestYear={latestYear} firstYear={firstYear} growth={growth} concentration={concentration} loading={loading} />}
+        {section === "Data import" ? <ImportPanel upload={upload} message={uploadMessage} rowCount={rows.length} source={dataSource} /> : section === "Methodology" ? <Methodology rows={rows} filtered={filtered} source={dataSource} lastUpdated={lastUpdated} quality={quality} /> : section === "Forecasting" ? <Forecast yearly={yearly} /> : section === "KPI evaluation" ? <Kpi filtered={filtered} total={total} growth={growth} concentration={concentration} targetGrowth={targetGrowth} setTargetGrowth={setTargetGrowth} /> : section === "Recommendations" ? <Recommendations filtered={filtered} growth={growth} concentration={concentration} targetGrowth={targetGrowth} crop={byCrop[0]?.name} /> : section === "Visualizations" ? <Visualizations filtered={filtered} byCrop={byCrop} chartType={visualChart} setChartType={setVisualChart} loading={loading} /> : section === "Weather" ? <WeatherPanel city={weatherCity} setCity={setWeatherCity} weather={weather} error={weatherError} load={loadWeather} /> : section === "Financials" ? <FinancialPanel filtered={filtered} total={total} /> : section === "Reports" ? <ReportsPanel printReport={printReport} downloadCsv={downloadCsv} /> : section === "Crop health" ? <DiseasePanel image={diseaseImage} setImage={setDiseaseImage} /> : section === "Market prices" ? <MarketPanel records={market} error={marketError} notice={marketNotice} load={loadMarket} /> : <Dashboard filtered={filtered} yearly={yearly} byCrop={byCrop} total={total} countries={countries} years={years} latestYear={latestYear} firstYear={firstYear} growth={growth} concentration={concentration} loading={loading} />}
       </div>
     </main>
   </div>;
@@ -376,69 +378,7 @@ export default function Home() {
 
 function WeatherPanel({ city, setCity, weather, error, load }: { city: string; setCity: (value: string) => void; weather: { location: string; updated: string; coordinates: { latitude: number; longitude: number }; sunrise: number; sunset: number; current: { temperature: number; feels_like: number; condition: string; humidity: number; pressure: number; visibility: number; clouds: number; rainfall: number; wind: number }; forecast: { date: string; temperature: number; rainfall: number; condition: string }[] } | null; error: string; load: () => void }) {
   const formatTime = (timestamp: number) => new Date(timestamp * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-  return <div className="panel-stack"><section className="visual-hero"><div><p className="eyebrow">FIELD CONDITIONS</p><h2>Weather intelligence for your farm</h2><p>Search any city or country to locate it on the globe and inspect live OpenWeather conditions.</p></div><div className="weather-search"><input value={city} onChange={(event) => setCity(event.target.value)} placeholder="City or country" onKeyDown={(event) => { if (event.key === "Enter") load(); }} /><button onClick={load}>Check weather</button></div></section>{error && <div className="alert error">{error}</div>}{weather ? <><section className="weather-explorer"><div className="globe-card"><div className="globe-heading"><div><p className="eyebrow">LIVE LOCATION</p><h2>{weather.location}</h2></div><span className="live-tag">OPENWEATHER LIVE</span></div><div className="globe-stage"><EarthGlobe latitude={weather.coordinates.latitude} longitude={weather.coordinates.longitude} /><div className="globe-caption"><span>{weather.coordinates.latitude.toFixed(4)}° {weather.coordinates.latitude >= 0 ? "N" : "S"}</span><span>{Math.abs(weather.coordinates.longitude).toFixed(4)}° {weather.coordinates.longitude >= 0 ? "E" : "W"}</span></div></div></div><div className="weather-detail-card"><p className="eyebrow">CURRENT CONDITIONS</p><div className="weather-condition"><strong>{weather.current.temperature}°C</strong><span>{weather.current.condition}</span></div><div className="weather-detail-grid"><div><small>Feels like</small><b>{weather.current.feels_like}°C</b></div><div><small>Humidity</small><b>{weather.current.humidity}%</b></div><div><small>Wind</small><b>{weather.current.wind} kph</b></div><div><small>Pressure</small><b>{weather.current.pressure} hPa</b></div><div><small>Visibility</small><b>{weather.current.visibility} km</b></div><div><small>Cloud cover</small><b>{weather.current.clouds}%</b></div><div><small>Rainfall</small><b>{weather.current.rainfall} mm</b></div><div><small>Sunrise / sunset</small><b>{formatTime(weather.sunrise)} / {formatTime(weather.sunset)}</b></div></div><p className="weather-updated">Updated {new Date(weather.updated).toLocaleString()}</p></div></section><section className="card table-card"><div className="card-heading"><div><h2>Five-day outlook</h2><p>Daily averages and precipitation from OpenWeather forecast data.</p></div></div><div className="table-wrap"><table><thead><tr><th>Date</th><th>Condition</th><th>Temperature</th><th>Rainfall</th></tr></thead><tbody>{weather.forecast.map((day) => <tr key={day.date}><td>{day.date}</td><td>{day.condition}</td><td>{day.temperature}°C</td><td>{day.rainfall} mm</td></tr>)}</tbody></table></div></section></> : <div className="card loading-card">Enter a location and check weather to locate it on the globe.</div>}</div>;
-}
-
-function EarthGlobe({ latitude, longitude }: { latitude: number; longitude: number }) {
-  const size = 380;
-  const [rotation, setRotation] = useState<[number, number, number]>([-longitude, -latitude, 0]);
-  const drag = useRef<{ x: number; y: number; rotation: [number, number, number] } | null>(null);
-  const projection = useMemo(() => geoOrthographic().translate([size / 2, size / 2]).scale(170).rotate(rotation), [rotation]);
-  const path = geoPath(projection);
-  const land = feature(world as never, world.objects.land as never);
-  const marker = projection([longitude, latitude]);
-  useEffect(() => {
-    const target: [number, number, number] = [-longitude, -latitude, 0];
-    const start = rotation;
-    const startedAt = performance.now();
-    let frame = 0;
-    const animate = (now: number) => {
-      const progress = Math.min((now - startedAt) / 850, 1);
-      const eased = 1 - Math.pow(1 - progress, 3);
-      setRotation([
-        start[0] + (target[0] - start[0]) * eased,
-        start[1] + (target[1] - start[1]) * eased,
-        0,
-      ]);
-      if (progress < 1) frame = requestAnimationFrame(animate);
-    };
-    frame = requestAnimationFrame(animate);
-    return () => cancelAnimationFrame(frame);
-  // Search results change these coordinates; the current rotation is the animation start.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [latitude, longitude]);
-  function handlePointerDown(event: React.PointerEvent<SVGSVGElement>) {
-    event.currentTarget.setPointerCapture(event.pointerId);
-    drag.current = { x: event.clientX, y: event.clientY, rotation };
-  }
-  function handlePointerMove(event: React.PointerEvent<SVGSVGElement>) {
-    if (!drag.current) return;
-    setRotation([
-      drag.current.rotation[0] + (event.clientX - drag.current.x) * 0.45,
-      Math.max(-88, Math.min(88, drag.current.rotation[1] - (event.clientY - drag.current.y) * 0.45)),
-      0,
-    ]);
-  }
-  function stopDragging(event: React.PointerEvent<SVGSVGElement>) {
-    if (drag.current) event.currentTarget.releasePointerCapture(event.pointerId);
-    drag.current = null;
-  }
-  return <div className="real-globe" aria-label={`Globe centered on ${latitude}, ${longitude}`}>
-    <svg className="real-globe-svg" viewBox={`0 0 ${size} ${size}`} role="img" onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={stopDragging} onPointerCancel={stopDragging}>
-      <defs><radialGradient id="ocean-gradient" cx="35%" cy="28%"><stop offset="0%" stopColor="#4d9ed0" /><stop offset="62%" stopColor="#176b9e" /><stop offset="100%" stopColor="#093b62" /></radialGradient><filter id="globe-shadow"><feDropShadow dx="0" dy="14" stdDeviation="12" floodColor="#063452" floodOpacity=".28" /></filter><clipPath id="globe-clip"><circle cx={size / 2} cy={size / 2} r="170" /></clipPath></defs>
-      <circle cx={size / 2} cy={size / 2} r="170" fill="url(#ocean-gradient)" filter="url(#globe-shadow)" />
-      <g clipPath="url(#globe-clip)">
-        <path d={path(geoGraticule10()) ?? undefined} fill="none" stroke="#bce5f04d" strokeWidth=".7" />
-        <path d={path(land) ?? undefined} fill="#5baa72" stroke="#d4efc766" strokeWidth=".65" />
-      </g>
-      <circle cx={size / 2} cy={size / 2} r="170" fill="none" stroke="#dff6ff66" strokeWidth="2" />
-      {marker && <g className="globe-location-marker" transform={`translate(${marker[0]} ${marker[1]})`} aria-label={`Pinned location at ${latitude}, ${longitude}`}>
-        <path d="M0 0C-1-7-11-12-11-20a11 11 0 1 1 22 0C11-12 1-7 0 0Z" fill="#ffd45f" stroke="#fff" strokeWidth="1.5" />
-        <circle cy="-20" r="3.5" fill="#174f75" />
-        <circle cy="2" r="5" fill="#ffd45f" opacity=".8" />
-      </g>}
-    </svg>
-  </div>;
+  return <div className="panel-stack"><section className="visual-hero"><div><p className="eyebrow">FIELD CONDITIONS</p><h2>Weather intelligence for your farm</h2><p>Search any city or country to locate it on the map and inspect live OpenWeather conditions.</p></div><div className="weather-search"><input value={city} onChange={(event) => setCity(event.target.value)} placeholder="City or country" onKeyDown={(event) => { if (event.key === "Enter") load(); }} /><button onClick={load}>Check weather</button></div></section>{error && <div className="alert error">{error}</div>}{weather ? <><section className="weather-explorer"><div className="globe-card"><div className="globe-heading"><div><p className="eyebrow">LIVE LOCATION</p><h2>{weather.location}</h2></div><span className="live-tag">OPENWEATHER LIVE</span></div><div className="globe-stage"><LocationMap latitude={weather.coordinates.latitude} longitude={weather.coordinates.longitude} location={weather.location} /><div className="globe-caption"><span>{weather.coordinates.latitude.toFixed(4)}° {weather.coordinates.latitude >= 0 ? "N" : "S"}</span><span>{Math.abs(weather.coordinates.longitude).toFixed(4)}° {weather.coordinates.longitude >= 0 ? "E" : "W"}</span></div></div></div><div className="weather-detail-card"><p className="eyebrow">CURRENT CONDITIONS</p><div className="weather-condition"><strong>{weather.current.temperature}°C</strong><span>{weather.current.condition}</span></div><div className="weather-detail-grid"><div><small>Feels like</small><b>{weather.current.feels_like}°C</b></div><div><small>Humidity</small><b>{weather.current.humidity}%</b></div><div><small>Wind</small><b>{weather.current.wind} kph</b></div><div><small>Pressure</small><b>{weather.current.pressure} hPa</b></div><div><small>Visibility</small><b>{weather.current.visibility} km</b></div><div><small>Cloud cover</small><b>{weather.current.clouds}%</b></div><div><small>Rainfall</small><b>{weather.current.rainfall} mm</b></div><div><small>Sunrise / sunset</small><b>{formatTime(weather.sunrise)} / {formatTime(weather.sunset)}</b></div></div><p className="weather-updated">Updated {new Date(weather.updated).toLocaleString()}</p></div></section><section className="card table-card"><div className="card-heading"><div><h2>Five-day outlook</h2><p>Daily averages and precipitation from OpenWeather forecast data.</p></div></div><div className="table-wrap"><table><thead><tr><th>Date</th><th>Condition</th><th>Temperature</th><th>Rainfall</th></tr></thead><tbody>{weather.forecast.map((day) => <tr key={day.date}><td>{day.date}</td><td>{day.condition}</td><td>{day.temperature}°C</td><td>{day.rainfall} mm</td></tr>)}</tbody></table></div></section></> : <div className="card loading-card">Enter a location and check weather to locate it on the map.</div>}</div>;
 }
 
 function FinancialPanel({ filtered, total }: { filtered: Row[]; total: number }) {
@@ -456,8 +396,8 @@ function DiseasePanel({ image, setImage }: { image: string; setImage: (value: st
   return <div className="panel-stack"><section className="section-intro"><span className="section-icon"><Stethoscope size={20} /></span><div><p className="eyebrow">CROP HEALTH LAB</p><h2>Screen a crop image</h2><p>Upload a clear leaf photo for the first local screening workflow. Connect a trained model later for production-grade diagnosis.</p></div></section><section className="card import-card"><label className="upload-button"><Upload size={17} /> Upload crop image<input type="file" accept="image/*" onChange={(event) => { const file = event.target.files?.[0]; if (file) setImage(URL.createObjectURL(file)); }} /></label>{image && <><img className="disease-preview" src={image} alt="Uploaded crop sample" /><div className="alert success">Image received. Preliminary screen: review for visible leaf discoloration, spots, and pest damage before taking action.</div></>}</section></div>;
 }
 
-function MarketPanel({ records, error, load }: { records: { commodity: string; year: string; price: string; unit: string }[]; error: string; load: () => void }) {
-  return <div className="panel-stack"><section className="visual-hero"><div><p className="eyebrow">MARKET INTELLIGENCE</p><h2>Track producer price signals</h2><p>FAOSTAT provides free official producer-price data for global comparisons.</p></div><button className="chart-switcher-button" onClick={load}>Refresh prices</button></section>{error && <div className="alert error">{error}</div>}{records.length ? <section className="card table-card"><div className="table-wrap"><table><thead><tr><th>Commodity</th><th>Year</th><th>Price</th><th>Unit</th></tr></thead><tbody>{records.map((record, index) => <tr key={`${record.commodity}-${record.year}-${index}`}><td>{record.commodity}</td><td>{record.year}</td><td>{record.price}</td><td>{record.unit}</td></tr>)}</tbody></table></div></section> : <div className="card loading-card">Refresh prices to load the latest available FAOSTAT producer-price records.</div>}</div>;
+function MarketPanel({ records, error, notice, load }: { records: { commodity: string; year: string; price: string; unit: string }[]; error: string; notice: string; load: () => void }) {
+  return <div className="panel-stack"><section className="visual-hero"><div><p className="eyebrow">MARKET INTELLIGENCE</p><h2>Track producer price signals</h2><p>FAOSTAT provides free official producer-price data for global comparisons.</p></div><button className="chart-switcher-button" onClick={load}>Refresh prices</button></section>{error && <div className="alert error">{error}</div>}{notice && <div className="alert">{notice}</div>}{records.length ? <section className="card table-card"><div className="table-wrap"><table><thead><tr><th>Commodity</th><th>Year</th><th>Price</th><th>Unit</th></tr></thead><tbody>{records.map((record, index) => <tr key={`${record.commodity}-${record.year}-${index}`}><td>{record.commodity}</td><td>{record.year}</td><td>{record.price}</td><td>{record.unit}</td></tr>)}</tbody></table></div></section> : <div className="card loading-card">Refresh prices to load the latest available FAOSTAT producer-price records.</div>}</div>;
 }
 
 function AuthScreen({

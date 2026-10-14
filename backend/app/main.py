@@ -21,7 +21,7 @@ COUNTRY_NAMES = {
     "nepal": "NP", "pakistan": "PK", "russia": "RU", "singapore": "SG",
     "south africa": "ZA", "spain": "ES", "sri lanka": "LK", "uae": "AE",
     "united arab emirates": "AE", "united kingdom": "GB", "united states": "US",
-    "usa": "US", "vietnam": "VN",
+    "usa": "US", "vietnam": "VN", "philippines": "PH",
 }
 COUNTRY_CENTROIDS = {
     "AU": (-25.2744, 133.7751), "BD": (23.6850, 90.3563), "BR": (-14.2350, -51.9253),
@@ -32,6 +32,7 @@ COUNTRY_CENTROIDS = {
     "PK": (30.3753, 69.3451), "RU": (61.5240, 105.3188), "SG": (1.3521, 103.8198),
     "ZA": (-30.5595, 22.9375), "ES": (40.4637, -3.7492), "LK": (7.8731, 80.7718),
     "AE": (23.4241, 53.8478), "US": (37.0902, -95.7129), "VN": (14.0583, 108.2772),
+    "PH": (12.8797, 121.7740),
 }
 
 
@@ -210,11 +211,18 @@ async def weather(city: str = Query(default="New Delhi", min_length=1)) -> dict:
     try:
         async with httpx.AsyncClient(timeout=15) as client:
             search = city.strip()
-            country_code = COUNTRY_NAMES.get(search.casefold())
+            parts = [part.strip() for part in search.split(",") if part.strip()]
+            requested_country = parts[-1] if len(parts) > 1 else search
+            country_code = COUNTRY_NAMES.get(requested_country.casefold())
+            city_query = ", ".join(parts[:-1]) if len(parts) > 1 else search
+            country_only = country_code is not None and len(parts) == 1
+            geocode_query = (
+                search if country_only else f"{city_query},{country_code}" if country_code else search
+            )
             geocode_response = await client.get(
                 "https://api.openweathermap.org/geo/1.0/direct",
                 params={
-                    "q": search,
+                    "q": geocode_query,
                     "limit": 5,
                     "appid": api_key,
                 },
@@ -223,17 +231,26 @@ async def weather(city: str = Query(default="New Delhi", min_length=1)) -> dict:
             locations = geocode_response.json()
             if not locations:
                 raise HTTPException(status_code=404, detail=f"Could not locate {search}.")
-            location = next(
-                (
-                    item
-                    for item in locations
-                    if country_code and item.get("country") == country_code
-                    and item.get("name", "").casefold() == search.casefold()
-                ),
-                locations[0],
-            )
+            if country_code and not country_only:
+                location = next(
+                    (
+                        item
+                        for item in locations
+                        if item.get("country") == country_code
+                        and item.get("name", "").casefold() == city_query.casefold()
+                    ),
+                    None,
+                )
+                if location is None:
+                    raise HTTPException(
+                        status_code=404,
+                        detail=f"Could not locate {city_query} in {requested_country}.",
+                    )
+            else:
+                location = locations[0]
             latitude, longitude = COUNTRY_CENTROIDS.get(
-                country_code, (float(location["lat"]), float(location["lon"]))
+                country_code if country_only else None,
+                (float(location["lat"]), float(location["lon"])),
             )
             current_response = await client.get(
                 "https://api.openweathermap.org/data/2.5/weather",
@@ -270,11 +287,7 @@ async def weather(city: str = Query(default="New Delhi", min_length=1)) -> dict:
         for date, day in sorted(daily.items())[:5]
     ]
     current = current_payload["main"]
-    display_location = (
-        f"{search.title()}, {country_code}"
-        if country_code
-        else f"{current_payload['name']}, {current_payload['sys']['country']}"
-    )
+    display_location = f"{current_payload['name']}, {current_payload['sys']['country']}"
     return {
         "location": display_location,
         "coordinates": {

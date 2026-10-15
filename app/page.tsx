@@ -369,7 +369,7 @@ export default function Home() {
       <header className="topbar"><button className="mobile-menu"><Menu size={20} /></button><div className="breadcrumb">Workspace <span>/</span> <b>{section}</b></div><div className="top-actions"><div className="search"><Search size={16} /><input placeholder="Search insights..." /></div><div className="profile-menu"><button className="profile-trigger" aria-expanded={profileOpen} onClick={() => setProfileOpen((open) => !open)}><span className="header-avatar"><UserCircle size={19} /></span><span className="profile-trigger-copy"><b>{authName || "Junior Analyst"}</b><small>{authEmail || "Internship workspace"}</small></span><ChevronDown size={15} /></button>{profileOpen && <div className="profile-dropdown"><div className="profile-dropdown-heading"><span className="header-avatar large"><UserCircle size={21} /></span><div><b>{authName || "Junior Analyst"}</b><small>{authEmail || "Internship workspace"}</small></div></div><button className="logout-button" onClick={logout}><LogOut size={16} /> Log out</button></div>}</div></div></header>
       <div className="content">
         {error && <div className="alert error">{error} Check your internet connection and reload.</div>}
-        <div className="page-heading"><div><p className="eyebrow">AGRICULTURAL INTELLIGENCE · 2026</p><h1>{section === "Overview" ? "Production overview" : section}</h1><p className="subtitle">{section === "Overview" ? "Turn production data into decisions you can defend." : "Explore the evidence behind your agribusiness decisions."}</p><p className="data-source">Source: <b>{dataSource}</b>{lastUpdated && <> · Updated {lastUpdated.toLocaleTimeString()}</>}</p></div>{section !== "KPI evaluation" && <div className="filters"><label>Country<select value={country} onChange={(e) => setCountry(e.target.value)}><option>All geographies</option>{countries.slice(0, 80).map((c) => <option key={c}>{c}</option>)}</select></label><label>Crop<select value={crop} onChange={(e) => setCrop(e.target.value)}><option>All crops</option>{crops.map((c) => <option key={c}>{c}</option>)}</select></label><label>Year<select value={year} onChange={(e) => setYear(e.target.value)}><option>All years</option>{years.slice(-30).map((y) => <option key={y}>{y}</option>)}</select></label></div>}</div>
+        <div className="page-heading"><div><p className="eyebrow">AGRICULTURAL INTELLIGENCE · 2026</p><h1>{section === "Overview" ? "Production overview" : section}</h1><p className="subtitle">{section === "Overview" ? "Turn production data into decisions you can defend." : "Explore the evidence behind your agribusiness decisions."}</p><p className="data-source">Source: <b>{dataSource}</b>{lastUpdated && <> · Updated {lastUpdated.toLocaleTimeString()}</>}</p></div></div>
         {section === "Data import" ? <ImportPanel upload={upload} message={uploadMessage} rowCount={rows.length} source={dataSource} /> : section === "Methodology" ? <Methodology rows={rows} filtered={filtered} source={dataSource} lastUpdated={lastUpdated} quality={quality} /> : section === "Forecasting" ? <Forecast yearly={yearly} /> : section === "KPI evaluation" ? <Kpi filtered={filtered} total={total} growth={growth} concentration={concentration} targetGrowth={targetGrowth} setTargetGrowth={setTargetGrowth} /> : section === "Recommendations" ? <Recommendations filtered={filtered} growth={growth} concentration={concentration} targetGrowth={targetGrowth} crop={byCrop[0]?.name} /> : section === "Visualizations" ? <Visualizations filtered={filtered} byCrop={byCrop} chartType={visualChart} setChartType={setVisualChart} loading={loading} /> : section === "Weather" ? <WeatherPanel city={weatherCity} setCity={setWeatherCity} weather={weather} error={weatherError} load={loadWeather} /> : section === "Financials" ? <FinancialPanel filtered={filtered} total={total} /> : section === "Reports" ? <ReportsPanel printReport={printReport} downloadCsv={downloadCsv} /> : section === "Crop health" ? <DiseasePanel image={diseaseImage} setImage={setDiseaseImage} /> : section === "Market prices" ? <MarketPanel records={market} error={marketError} notice={marketNotice} load={loadMarket} /> : <Dashboard filtered={filtered} yearly={yearly} byCrop={byCrop} total={total} countries={countries} years={years} latestYear={latestYear} firstYear={firstYear} growth={growth} concentration={concentration} loading={loading} />}
       </div>
     </main>
@@ -393,7 +393,47 @@ function ReportsPanel({ printReport, downloadCsv }: { printReport: () => void; d
 }
 
 function DiseasePanel({ image, setImage }: { image: string; setImage: (value: string) => void }) {
-  return <div className="panel-stack"><section className="section-intro"><span className="section-icon"><Stethoscope size={20} /></span><div><p className="eyebrow">CROP HEALTH LAB</p><h2>Screen a crop image</h2><p>Upload a clear leaf photo for the first local screening workflow. Connect a trained model later for production-grade diagnosis.</p></div></section><section className="card import-card"><label className="upload-button"><Upload size={17} /> Upload crop image<input type="file" accept="image/*" onChange={(event) => { const file = event.target.files?.[0]; if (file) setImage(URL.createObjectURL(file)); }} /></label>{image && <><img className="disease-preview" src={image} alt="Uploaded crop sample" /><div className="alert success">Image received. Preliminary screen: review for visible leaf discoloration, spots, and pest damage before taking action.</div></>}</section></div>;
+  type CropHealthAnalysis = {
+    crop: string;
+    health_status: string;
+    issue: string;
+    confidence: string;
+    summary: string;
+    symptoms: string[];
+    precautions: string[];
+    next_steps: string[];
+  };
+  const [analysis, setAnalysis] = useState<CropHealthAnalysis | null>(null);
+  const [analyzing, setAnalyzing] = useState(false);
+  const [analysisError, setAnalysisError] = useState("");
+
+  async function analyzeImage(file: File) {
+    const previewUrl = URL.createObjectURL(file);
+    setImage(previewUrl);
+    setAnalysis(null);
+    setAnalysisError("");
+    setAnalyzing(true);
+    const formData = new FormData();
+    formData.append("file", file);
+    try {
+      const response = await fetch(`${API_BASE}/api/crop-health/analyze`, { method: "POST", body: formData });
+      const result = await response.json() as { analysis?: CropHealthAnalysis; detail?: string };
+      if (!response.ok || !result.analysis) throw new Error(result.detail ?? "The crop image could not be analyzed.");
+      setAnalysis(result.analysis);
+    } catch (error) {
+      setAnalysisError(error instanceof Error ? error.message : "The crop image could not be analyzed.");
+    } finally {
+      setAnalyzing(false);
+    }
+  }
+
+  function handleFile(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (file) void analyzeImage(file);
+    event.target.value = "";
+  }
+
+  return <div className="panel-stack"><section className="section-intro"><span className="section-icon"><Stethoscope size={20} /></span><div><p className="eyebrow">AI CROP HEALTH LAB</p><h2>Get an image-specific crop health report</h2><p>Groq vision analysis examines each new image and returns crop details, visible symptoms, precautions, and practical next steps.</p></div></section><section className={`card disease-card${image ? " has-result" : ""}`}>{!image ? <div className="disease-upload-empty"><div className="upload-icon"><Upload size={27} /></div><h2>Upload a crop image</h2><p>Use a well-lit photo showing the leaf, stem, fruit, or panicle clearly. Results are AI-assisted screening guidance, not a laboratory diagnosis.</p><label className="upload-button"><Upload size={17} /> Choose crop image<input type="file" accept="image/*" onChange={handleFile} /></label></div> : <><div className="disease-result-header"><div><p className="eyebrow">AI SCREENING RESULT</p><h2>{analysis ? `${analysis.crop} crop health guide` : "Analyzing your crop image"}</h2><p>{analyzing ? "Groq vision is examining the latest uploaded image. This may take a few seconds." : analysis ? "Generated from the latest uploaded image. Confirm important decisions with a qualified agronomist." : "The image preview is ready."}</p></div><label className="secondary-upload-button">Replace image<input type="file" accept="image/*" onChange={handleFile} /></label></div>{analysisError && <div className="alert error">{analysisError}</div>}{analyzing && <div className="analysis-loading"><span className="dot loading" /> Analyzing crop health and preparing guidance…</div>}{analysis && <><div className="disease-result-layout"><div><img className="disease-preview" src={image} alt={`Uploaded ${analysis.crop} crop sample`} /><div className="disease-confidence"><span>Crop identified</span><b>{analysis.crop}</b><small>{analysis.confidence} confidence</small></div></div><div className="disease-diagnosis"><span className={`disease-status ${analysis.health_status === "Healthy" ? "healthy" : ""}`}>{analysis.health_status}</span><h3>{analysis.issue}</h3><p>{analysis.summary}</p><div className="disease-facts"><div><small>Crop</small><b>{analysis.crop}</b></div><div><small>Confidence</small><b>{analysis.confidence}</b></div><div><small>Action</small><b>{analysis.health_status === "Healthy" ? "Continue monitoring" : "Inspect nearby plants"}</b></div></div></div></div><div className="disease-guidance-grid"><section><h3>Visible symptoms to check</h3><ul>{analysis.symptoms.map((symptom) => <li key={symptom}>{symptom}</li>)}</ul></section><section><h3>Precautions</h3><ul>{analysis.precautions.map((precaution) => <li key={precaution}>{precaution}</li>)}</ul></section><section><h3>Recommended next steps</h3><ul>{analysis.next_steps.map((nextStep) => <li key={nextStep}>{nextStep}</li>)}</ul></section></div><div className="disease-disclaimer">Safety note: AI screening can be wrong and cannot replace field inspection or laboratory confirmation. Do not apply pesticides based only on this result.</div></>}</>}</section></div>;
 }
 
 function MarketPanel({ records, error, notice, load }: { records: { commodity: string; year: string; price: string; unit: string }[]; error: string; notice: string; load: () => void }) {

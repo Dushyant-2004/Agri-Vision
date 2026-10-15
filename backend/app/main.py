@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import base64
+import json
 from collections import defaultdict
 from datetime import datetime, timezone
 from io import BytesIO
@@ -201,6 +203,84 @@ async def methodology() -> dict:
         ],
         "limitations": "Production data alone cannot estimate profitability, sustainability, or causality.",
     }
+
+
+@app.post("/api/crop-health/analyze")
+async def analyze_crop_health(file: Annotated[UploadFile, File(...)]) -> dict:
+    api_key = os.getenv("GROQ_API_KEY")
+    if not api_key:
+        raise HTTPException(status_code=503, detail="GROQ_API_KEY is not configured.")
+    if not file.content_type or not file.content_type.startswith("image/"):
+        raise HTTPException(status_code=400, detail="Please upload a valid crop image.")
+
+    image_bytes = await file.read()
+    if not image_bytes:
+        raise HTTPException(status_code=400, detail="The uploaded image is empty.")
+    if len(image_bytes) > 10 * 1024 * 1024:
+        raise HTTPException(status_code=413, detail="Please upload an image smaller than 10 MB.")
+
+    prompt = """Analyze this crop image for an agricultural field screening report.
+Return ONLY valid JSON with exactly these string/array fields:
+{
+  "crop": "identified crop or Unknown",
+  "health_status": "Healthy | Needs attention | Unclear",
+  "issue": "short diagnosis or Healthy crop",
+  "confidence": "High | Medium | Low",
+  "summary": "plain-language visual explanation",
+  "symptoms": ["visible symptom or sign to check"],
+  "precautions": ["practical precaution"],
+  "next_steps": ["recommended next step"]
+}
+Do not claim certainty from one image. If the crop looks healthy, say so and do not invent a disease.
+If the image is unclear or not a crop, set health_status to "Unclear" and explain why.
+Keep each array to 3-5 concise items. Never recommend a specific pesticide, dose, or chemical without local expert confirmation."""
+    image_data = base64.b64encode(image_bytes).decode("ascii")
+    request_payload = {
+        "model": "meta-llama/llama-4-scout-17b-16e-instruct",
+        "temperature": 0.1,
+        "response_format": {"type": "json_object"},
+        "messages": [
+            {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": prompt},
+                    {
+                        "type": "image_url",
+                        "image_url": {
+                            "url": f"data:{file.content_type};base64,{image_data}"
+                        },
+                    },
+                ],
+            }
+        ],
+    }
+    try:
+        async with httpx.AsyncClient(timeout=60) as client:
+            response = await client.post(
+                "https://api.groq.com/openai/v1/chat/completions",
+                headers={"Authorization": f"Bearer {api_key}"},
+                json=request_payload,
+            )
+            response.raise_for_status()
+        payload = response.json()
+        content = payload["choices"][0]["message"]["content"]
+        analysis = json.loads(content)
+    except (httpx.HTTPError, KeyError, IndexError, TypeError, json.JSONDecodeError) as error:
+        raise HTTPException(
+            status_code=502,
+            detail="The crop image could not be analyzed right now. Please try again.",
+        ) from error
+
+    required_fields = {
+        "crop", "health_status", "issue", "confidence",
+        "summary", "symptoms", "precautions", "next_steps",
+    }
+    if not isinstance(analysis, dict) or not required_fields.issubset(analysis) or any(
+        not isinstance(analysis[field], (list if field in {"symptoms", "precautions", "next_steps"} else str))
+        for field in required_fields
+    ):
+        raise HTTPException(status_code=502, detail="The crop analysis returned an invalid result.")
+    return {"analysis": analysis}
 
 
 @app.get("/api/weather")

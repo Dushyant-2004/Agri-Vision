@@ -71,7 +71,9 @@ For live weather, set `OPENWEATHER_API_KEY` in `backend/.env`. This file is igno
 Set-Content -Path "backend\.env" -Value 'OPENWEATHER_API_KEY=your-openweather-api-key'
 ```
 
-The market-price workspace uses the public FAOSTAT producer-price endpoint and may be unavailable when FAOSTAT is rate-limited. Crop health currently provides the image-upload and review workflow; connect a trained model before treating its screening text as a diagnosis.
+For crop-health image analysis, set `GROQ_API_KEY` in `backend/.env`. The backend uses `qwen/qwen3.8-27b` by default because it supports image input; override it with `GROQ_VISION_MODEL` if your Groq account uses another available vision model. Crop health provides AI-assisted screening guidance, not a laboratory diagnosis.
+
+The market-price workspace uses the public FAOSTAT producer-price endpoint and may be unavailable when FAOSTAT is rate-limited.
 
 ## Production run
 

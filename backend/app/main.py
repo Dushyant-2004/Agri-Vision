@@ -236,7 +236,8 @@ If the image is unclear or not a crop, set health_status to "Unclear" and explai
 Keep each array to 3-5 concise items. Never recommend a specific pesticide, dose, or chemical without local expert confirmation."""
     image_data = base64.b64encode(image_bytes).decode("ascii")
     request_payload = {
-        "model": "meta-llama/llama-4-scout-17b-16e-instruct",
+        # Keep the model configurable because provider model availability changes.
+        "model": os.getenv("GROQ_VISION_MODEL", "qwen/qwen3.8-27b"),
         "temperature": 0.1,
         "response_format": {"type": "json_object"},
         "messages": [

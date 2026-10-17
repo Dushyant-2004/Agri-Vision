@@ -7,7 +7,7 @@ import {
   BarChart3, BookOpen, ChevronRight, CloudDownload, Database, FileUp,
   Gauge, LayoutDashboard, Lightbulb, Menu, Search, Settings2, Sprout,
   TrendingUp, Upload, UserCircle, LogOut, ChevronDown, X, CloudSun, WalletCards,
-  FileText, Stethoscope, ShoppingBasket, MapPin
+  FileText, Stethoscope, MapPin
 } from "lucide-react";
 import {
   Bar, BarChart, CartesianGrid, Line, LineChart, ResponsiveContainer,
@@ -29,7 +29,7 @@ type DataQuality = {
   invalid_numeric_or_negative_removed: number;
   duplicate_rows_removed: number;
 };
-type Section = "Overview" | "Data import" | "Visualizations" | "Forecasting" | "KPI evaluation" | "Recommendations" | "Methodology" | "Weather" | "Financials" | "Reports" | "Crop health" | "Market prices";
+type Section = "Overview" | "Data import" | "Visualizations" | "Forecasting" | "KPI evaluation" | "Recommendations" | "Methodology" | "Weather" | "Financials" | "Reports" | "Crop health";
 type AuthMode = "login" | "signup";
 
 const SOURCES = [
@@ -93,9 +93,6 @@ export default function Home() {
   const [weatherCity, setWeatherCity] = useState("New Delhi");
   const [weather, setWeather] = useState<{ location: string; updated: string; coordinates: { latitude: number; longitude: number }; sunrise: number; sunset: number; current: { temperature: number; feels_like: number; condition: string; humidity: number; pressure: number; visibility: number; clouds: number; rainfall: number; wind: number }; forecast: { date: string; temperature: number; rainfall: number; condition: string }[] } | null>(null);
   const [weatherError, setWeatherError] = useState("");
-  const [market, setMarket] = useState<{ commodity: string; year: string; price: string; unit: string }[]>([]);
-  const [marketError, setMarketError] = useState("");
-  const [marketNotice, setMarketNotice] = useState("");
   const [diseaseImage, setDiseaseImage] = useState("");
 
   useEffect(() => {
@@ -288,20 +285,6 @@ export default function Home() {
     }
   }
 
-  async function loadMarket() {
-    setMarketError("");
-    setMarketNotice("");
-    try {
-      const response = await fetch(`${API_BASE}/api/market-prices`);
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.detail ?? "Market data could not be loaded.");
-      setMarket(result.records);
-      setMarketNotice(result.notice ?? "");
-    } catch (marketRequestError) {
-      setMarketError(marketRequestError instanceof Error ? marketRequestError.message : "Market data could not be loaded.");
-    }
-  }
-
   function printReport() {
     const escapeHtml = (value: string) => value.replace(/[&<>"']/g, (character) => ({
       "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
@@ -354,8 +337,7 @@ export default function Home() {
     { label: "Weather", icon: <CloudSun size={18} /> },
     { label: "Financials", icon: <WalletCards size={18} /> },
     { label: "Reports", icon: <FileText size={18} /> },
-    { label: "Crop health", icon: <Stethoscope size={18} /> },
-    { label: "Market prices", icon: <ShoppingBasket size={18} /> }
+    { label: "Crop health", icon: <Stethoscope size={18} /> }
   ];
 
   return <div className="app-shell">
@@ -370,7 +352,7 @@ export default function Home() {
       <div className="content">
         {error && <div className="alert error">{error} Check your internet connection and reload.</div>}
         <div className="page-heading"><div><p className="eyebrow">AGRICULTURAL INTELLIGENCE · 2026</p><h1>{section === "Overview" ? "Production overview" : section}</h1><p className="subtitle">{section === "Overview" ? "Turn production data into decisions you can defend." : "Explore the evidence behind your agribusiness decisions."}</p><p className="data-source">Source: <b>{dataSource}</b>{lastUpdated && <> · Updated {lastUpdated.toLocaleTimeString()}</>}</p></div></div>
-        {section === "Data import" ? <ImportPanel upload={upload} message={uploadMessage} rowCount={rows.length} source={dataSource} /> : section === "Methodology" ? <Methodology rows={rows} filtered={filtered} source={dataSource} lastUpdated={lastUpdated} quality={quality} /> : section === "Forecasting" ? <Forecast yearly={yearly} /> : section === "KPI evaluation" ? <Kpi filtered={filtered} total={total} growth={growth} concentration={concentration} targetGrowth={targetGrowth} setTargetGrowth={setTargetGrowth} /> : section === "Recommendations" ? <Recommendations filtered={filtered} growth={growth} concentration={concentration} targetGrowth={targetGrowth} crop={byCrop[0]?.name} /> : section === "Visualizations" ? <Visualizations filtered={filtered} byCrop={byCrop} chartType={visualChart} setChartType={setVisualChart} loading={loading} /> : section === "Weather" ? <WeatherPanel city={weatherCity} setCity={setWeatherCity} weather={weather} error={weatherError} load={loadWeather} /> : section === "Financials" ? <FinancialPanel filtered={filtered} total={total} /> : section === "Reports" ? <ReportsPanel printReport={printReport} downloadCsv={downloadCsv} /> : section === "Crop health" ? <DiseasePanel image={diseaseImage} setImage={setDiseaseImage} /> : section === "Market prices" ? <MarketPanel records={market} error={marketError} notice={marketNotice} load={loadMarket} /> : <Dashboard filtered={filtered} yearly={yearly} byCrop={byCrop} total={total} countries={countries} years={years} latestYear={latestYear} firstYear={firstYear} growth={growth} concentration={concentration} loading={loading} />}
+        {section === "Data import" ? <ImportPanel upload={upload} message={uploadMessage} rowCount={rows.length} source={dataSource} /> : section === "Methodology" ? <Methodology rows={rows} filtered={filtered} source={dataSource} lastUpdated={lastUpdated} quality={quality} /> : section === "Forecasting" ? <Forecast yearly={yearly} /> : section === "KPI evaluation" ? <Kpi filtered={filtered} total={total} growth={growth} concentration={concentration} targetGrowth={targetGrowth} setTargetGrowth={setTargetGrowth} /> : section === "Recommendations" ? <Recommendations filtered={filtered} growth={growth} concentration={concentration} targetGrowth={targetGrowth} crop={byCrop[0]?.name} /> : section === "Visualizations" ? <Visualizations filtered={filtered} byCrop={byCrop} chartType={visualChart} setChartType={setVisualChart} loading={loading} /> : section === "Weather" ? <WeatherPanel city={weatherCity} setCity={setWeatherCity} weather={weather} error={weatherError} load={loadWeather} /> : section === "Financials" ? <FinancialPanel filtered={filtered} total={total} /> : section === "Reports" ? <ReportsPanel printReport={printReport} downloadCsv={downloadCsv} /> : section === "Crop health" ? <DiseasePanel image={diseaseImage} setImage={setDiseaseImage} /> : <Dashboard filtered={filtered} yearly={yearly} byCrop={byCrop} total={total} countries={countries} years={years} latestYear={latestYear} firstYear={firstYear} growth={growth} concentration={concentration} loading={loading} />}
       </div>
     </main>
   </div>;
@@ -434,10 +416,6 @@ function DiseasePanel({ image, setImage }: { image: string; setImage: (value: st
   }
 
   return <div className="panel-stack"><section className="section-intro"><span className="section-icon"><Stethoscope size={20} /></span><div><p className="eyebrow">AI CROP HEALTH LAB</p><h2>Get an image-specific crop health report</h2><p>Groq vision analysis examines each new image and returns crop details, visible symptoms, precautions, and practical next steps.</p></div></section><section className={`card disease-card${image ? " has-result" : ""}`}>{!image ? <div className="disease-upload-empty"><div className="upload-icon"><Upload size={27} /></div><h2>Upload a crop image</h2><p>Use a well-lit photo showing the leaf, stem, fruit, or panicle clearly. Results are AI-assisted screening guidance, not a laboratory diagnosis.</p><label className="upload-button"><Upload size={17} /> Choose crop image<input type="file" accept="image/*" onChange={handleFile} /></label></div> : <><div className="disease-result-header"><div><p className="eyebrow">AI SCREENING RESULT</p><h2>{analysis ? `${analysis.crop} crop health guide` : "Analyzing your crop image"}</h2><p>{analyzing ? "Groq vision is examining the latest uploaded image. This may take a few seconds." : analysis ? "Generated from the latest uploaded image. Confirm important decisions with a qualified agronomist." : "The image preview is ready."}</p></div><label className="secondary-upload-button">Replace image<input type="file" accept="image/*" onChange={handleFile} /></label></div>{analysisError && <div className="alert error">{analysisError}</div>}{analyzing && <div className="analysis-loading"><span className="dot loading" /> Analyzing crop health and preparing guidance…</div>}{analysis && <><div className="disease-result-layout"><div><img className="disease-preview" src={image} alt={`Uploaded ${analysis.crop} crop sample`} /><div className="disease-confidence"><span>Crop identified</span><b>{analysis.crop}</b><small>{analysis.confidence} confidence</small></div></div><div className="disease-diagnosis"><span className={`disease-status ${analysis.health_status === "Healthy" ? "healthy" : ""}`}>{analysis.health_status}</span><h3>{analysis.issue}</h3><p>{analysis.summary}</p><div className="disease-facts"><div><small>Crop</small><b>{analysis.crop}</b></div><div><small>Confidence</small><b>{analysis.confidence}</b></div><div><small>Action</small><b>{analysis.health_status === "Healthy" ? "Continue monitoring" : "Inspect nearby plants"}</b></div></div></div></div><div className="disease-guidance-grid"><section><h3>Visible symptoms to check</h3><ul>{analysis.symptoms.map((symptom) => <li key={symptom}>{symptom}</li>)}</ul></section><section><h3>Precautions</h3><ul>{analysis.precautions.map((precaution) => <li key={precaution}>{precaution}</li>)}</ul></section><section><h3>Recommended next steps</h3><ul>{analysis.next_steps.map((nextStep) => <li key={nextStep}>{nextStep}</li>)}</ul></section></div><div className="disease-disclaimer">Safety note: AI screening can be wrong and cannot replace field inspection or laboratory confirmation. Do not apply pesticides based only on this result.</div></>}</>}</section></div>;
-}
-
-function MarketPanel({ records, error, notice, load }: { records: { commodity: string; year: string; price: string; unit: string }[]; error: string; notice: string; load: () => void }) {
-  return <div className="panel-stack"><section className="visual-hero"><div><p className="eyebrow">MARKET INTELLIGENCE</p><h2>Track producer price signals</h2><p>FAOSTAT provides free official producer-price data for global comparisons.</p></div><button className="chart-switcher-button" onClick={load}>Refresh prices</button></section>{error && <div className="alert error">{error}</div>}{notice && <div className="alert">{notice}</div>}{records.length ? <section className="card table-card"><div className="table-wrap"><table><thead><tr><th>Commodity</th><th>Year</th><th>Price</th><th>Unit</th></tr></thead><tbody>{records.map((record, index) => <tr key={`${record.commodity}-${record.year}-${index}`}><td>{record.commodity}</td><td>{record.year}</td><td>{record.price}</td><td>{record.unit}</td></tr>)}</tbody></table></div></section> : <div className="card loading-card">Refresh prices to load the latest available FAOSTAT producer-price records.</div>}</div>;
 }
 
 function AuthScreen({

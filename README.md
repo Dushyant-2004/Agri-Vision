@@ -1,12 +1,12 @@
 # AgriVision — Smart Agribusiness Analytics Dashboard
 
-AgriVision is an internship portfolio project that converts crop-production data into transparent visualizations, forecasts, KPI evaluations, and evidence-based recommendations.
+AgriVision is an internship portfolio project that converts crop-production data into transparent visualizations, forecasts, KPI evaluations, and evidence-based recommendations. The interface is designed around a clean agribusiness workspace with KPI cards, ranked comparisons, distribution charts, and decision-ready exports.
 
 ## Features
 
 - Live default data from Our World in Data Grapher, with FAOSTAT documented as the underlying source.
 - CSV upload with schema validation and cleaning for missing, duplicate, malformed, and negative-production records.
-- Overview and visualization workspaces with trend, bar, and histogram charts.
+- Overview and visualization workspaces with trend, bar, histogram, ranked comparison, donut distribution, geography, and growth-rate charts.
 - Filters for geography, crop, and year.
 - Chronological moving-average forecasting with limitations clearly explained.
 - KPI evaluation for production, growth, concentration, yield, revenue, costs, profit, farmer income, water productivity, sustainability, and weather-risk availability.
@@ -17,7 +17,7 @@ AgriVision is an internship portfolio project that converts crop-production data
 
 ## Technology
 
-- Frontend: Next.js 14, React, TypeScript, Recharts, Papa Parse, and CSS.
+- Frontend: Next.js 16, React, TypeScript, Recharts, Papa Parse, and CSS.
 - Backend: FastAPI, Pandas, NumPy, and scikit-learn.
 - Current persistence: one cleaned active dataset in backend memory.
 - Planned persistence: PostgreSQL.
@@ -36,6 +36,12 @@ Install frontend dependencies:
 ```powershell
 cd "D:\Agri Vision"
 npm install
+```
+
+If dependencies were previously installed with an older Next.js version, restore the lockfile exactly:
+
+```powershell
+npm ci
 ```
 
 Install backend dependencies:
@@ -75,6 +81,26 @@ For crop-health image analysis, set `GROQ_API_KEY` in `backend/.env`. The backen
 
 The market-price workspace uses the public FAOSTAT producer-price endpoint and may be unavailable when FAOSTAT is rate-limited.
 
+## Screenshots
+
+### Login and workspace entry
+
+![AgriVision login page](public/login.png)
+
+### Production dashboard
+
+![AgriVision production dashboard](public/dashboard.png)
+
+### Visualization workspace
+
+![AgriVision visualizations](public/visualizations.png)
+
+The screenshots are generated from the local production build using the public OWID/FAOSTAT data source. They are included to make the visual direction and chart layout easy to review without running the app.
+
+## Demo video
+
+The repository currently includes the screenshot walkthrough above but does not commit a recorded video file. To record a current demo locally, run `npm run dev`, open `http://localhost:3000`, and use the browser or operating-system screen recorder while moving through **Overview**, **Visualizations**, **Forecasting**, and **Reports**. This keeps the demo aligned with the current data and avoids committing a stale or oversized recording to the repository.
+
 ## Production run
 
 ```powershell
@@ -82,6 +108,19 @@ cd "D:\Agri Vision"
 npm run build
 npm start
 ```
+
+If the browser shows `GET / 404` or `/_next/static/... 404` after a rebuild, stop any older `next start` or `next dev` process and start only one server. Next.js build output is intentionally separated by `next.config.mjs`: production uses `.next`, while development uses `.next-dev`. Starting an old process against a replaced build can make its HTML reference chunks that no longer exist.
+
+## Validation and security
+
+Run the production checks before sharing a build:
+
+```powershell
+npm run build
+npm audit --omit=dev
+```
+
+The current dependency lockfile is audited with zero production vulnerabilities. Do not use `npm audit fix --force` casually in unrelated work because it can introduce a major framework upgrade; review the resulting build whenever dependency remediation is required.
 
 ## Backend API
 

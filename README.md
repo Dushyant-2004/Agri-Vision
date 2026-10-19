@@ -5,6 +5,7 @@ AgriVision is an internship portfolio project that converts crop-production data
 ## Features
 
 - Live default data from Our World in Data Grapher, with FAOSTAT documented as the underlying source.
+- Default crop-production charts use the 2000–2026 analysis window; historical values stop at the latest year published by the source, and the Forecasting workspace labels baseline estimates through 2026 separately.
 - CSV upload with schema validation and cleaning for missing, duplicate, malformed, and negative-production records.
 - Overview and visualization workspaces with trend, bar, histogram, ranked comparison, donut distribution, geography, and growth-rate charts.
 - Filters for geography, crop, and year.

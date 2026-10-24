@@ -70,6 +70,17 @@ Open the dashboard at http://localhost:3000.
 
 Open the interactive API documentation at http://127.0.0.1:8000/docs.
 
+Run the backend automated tests:
+
+```powershell
+cd "D:\Agri Vision\backend"
+& "..\.venv\Scripts\python.exe" -m pytest
+```
+
+The test suite covers CSV cleaning and validation, filter behavior, forecast
+minimum-data handling, optional KPI availability, upload validation, and the
+health endpoint.
+
 The frontend uses `http://127.0.0.1:8000` by default. To use another API URL, copy `.env.example` to `.env.local` and set `NEXT_PUBLIC_API_URL`. If the backend is unavailable, the frontend uses its local CSV validation fallback.
 
 For live weather, set `OPENWEATHER_API_KEY` in `backend/.env`. This file is ignored by Git and loaded automatically by the backend. Keep the key backend-only; do not expose it as a `NEXT_PUBLIC_` variable or commit it to the repository:

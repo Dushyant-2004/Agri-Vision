@@ -14,7 +14,6 @@ India,Rice,2022,300
 """
 
 
-
     cleaned, quality = clean_csv(raw)
 
     assert cleaned[["year", "production"]].to_dict("records") == [

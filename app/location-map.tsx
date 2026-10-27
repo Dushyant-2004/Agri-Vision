@@ -9,6 +9,8 @@ type LeafletElement = HTMLDivElement & {
   _agrivision_map?: L.Map;
 };
 
+
+
 export default function LocationMap({ latitude, longitude, location }: { latitude: number; longitude: number; location: string }) {
   const mapElement = useRef<HTMLDivElement>(null);
   const markerIcon = useMemo(() => L.divIcon({

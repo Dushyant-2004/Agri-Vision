@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 from io import BytesIO
+import re
 from typing import Any
 
 import numpy as np
 import pandas as pd
+from pypdf import PdfReader
+from pypdf.errors import PdfReadError
 from sklearn.linear_model import LinearRegression
 
 REQUIRED_COLUMNS = {"year", "production"}
@@ -35,8 +38,7 @@ def _find_column(columns: list[str], *terms: str) -> str | None:
     return None
 
 
-def clean_csv(raw: bytes) -> tuple[pd.DataFrame, dict[str, Any]]:
-    frame = pd.read_csv(BytesIO(raw))
+def _clean_frame(frame: pd.DataFrame) -> tuple[pd.DataFrame, dict[str, Any]]:
     original_count = len(frame)
     columns = list(frame.columns)
     year_column = _find_column(columns, "year")
@@ -91,6 +93,46 @@ def clean_csv(raw: bytes) -> tuple[pd.DataFrame, dict[str, Any]]:
             "Removed duplicate records.",
         ],
     }
+
+
+def clean_csv(raw: bytes) -> tuple[pd.DataFrame, dict[str, Any]]:
+    return _clean_frame(pd.read_csv(BytesIO(raw)))
+
+
+def _split_pdf_row(line: str) -> list[str]:
+    if "," in line:
+        return [part.strip() for part in line.split(",")]
+    if "\t" in line:
+        return [part.strip() for part in line.split("\t") if part.strip()]
+    parts = [part.strip() for part in re.split(r"\s{2,}", line) if part.strip()]
+    return parts if len(parts) > 1 else line.split()
+
+
+def clean_pdf(raw: bytes) -> tuple[pd.DataFrame, dict[str, Any]]:
+    reader = PdfReader(BytesIO(raw))
+    text = "\n".join(page.extract_text() or "" for page in reader.pages)
+    lines = [line.strip() for line in text.splitlines() if line.strip()]
+    header_index = next(
+        (
+            index
+            for index, line in enumerate(lines)
+            if "year" in line.lower()
+            and ("production" in line.lower() or "yield" in line.lower())
+        ),
+        None,
+    )
+    if header_index is None:
+        raise ValueError(
+            "PDF must contain a selectable-text table with Year and Production columns. "
+            "Scanned image PDFs are not supported."
+        )
+
+    headers = _split_pdf_row(lines[header_index])
+    records = [_split_pdf_row(line) for line in lines[header_index + 1 :]]
+    rows = [dict(zip(headers, values)) for values in records if len(values) >= len(headers)]
+    if not rows:
+        raise ValueError("PDF contains no table rows after the header.")
+    return _clean_frame(pd.DataFrame(rows))
 
 
 def summary(frame: pd.DataFrame) -> dict[str, Any]:

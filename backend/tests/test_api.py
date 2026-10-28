@@ -16,12 +16,20 @@ def test_health_endpoint():
     }
 
 
-def test_upload_rejects_non_csv():
+def test_upload_rejects_unsupported_file_type():
     response = client.post(
         "/api/data/upload",
         files={"file": ("dataset.txt", b"not a csv", "text/plain")},
     )
 
     assert response.status_code == 400
-    assert response.json()["detail"] == "Only CSV files are supported."
+    assert response.json()["detail"] == "Only CSV and PDF files are supported."
 
+
+def test_upload_rejects_unreadable_pdf():
+    response = client.post(
+        "/api/data/upload",
+        files={"file": ("dataset.pdf", b"not a pdf", "application/pdf")},
+    )
+
+    assert response.status_code == 422

@@ -217,30 +217,49 @@ export default function Home() {
   }
 
   async function upload(file: File) {
-    const preview = await new Promise<UploadedPreview | null>((resolve) => {
-      Papa.parse<Record<string, string>>(file, {
-        header: true,
-        skipEmptyLines: true,
-        preview: 5000,
-        complete: (result) => {
-          const headers = result.meta.fields ?? [];
-          resolve(headers.length ? { fileName: file.name, headers, rows: result.data } : null);
-        },
-        error: () => resolve(null)
+    const isPdf = file.name.toLowerCase().endsWith(".pdf");
+    if (!isPdf && !file.name.toLowerCase().endsWith(".csv")) {
+      setUploadMessage("Please choose a CSV or PDF file.");
+      return;
+    }
+    if (!isPdf) {
+      const preview = await new Promise<UploadedPreview | null>((resolve) => {
+        Papa.parse<Record<string, string>>(file, {
+          header: true,
+          skipEmptyLines: true,
+          preview: 5000,
+          complete: (result) => {
+            const headers = result.meta.fields ?? [];
+            resolve(headers.length ? { fileName: file.name, headers, rows: result.data } : null);
+          },
+          error: () => resolve(null)
+        });
       });
-    });
-    setUploadedPreview(preview);
+      setUploadedPreview(preview);
+    } else {
+      setUploadedPreview(null);
+    }
     const form = new FormData();
     form.append("file", file);
     try {
       const response = await fetch(`${API_BASE}/api/data/upload`, { method: "POST", body: form });
       if (!response.ok) {
         const detail = await response.json().catch(() => ({}));
-        throw new Error(detail.detail ?? "The Python data service rejected this CSV.");
+        throw new Error(detail.detail ?? `The Python data service rejected this ${isPdf ? "PDF" : "CSV"}.`);
       }
 
       const result = await response.json() as { records: Row[]; source: string; quality: DataQuality };
       const imported = result.records;
+      if (isPdf) {
+        const headers = Object.keys(imported[0] ?? {});
+        setUploadedPreview({
+          fileName: file.name,
+          headers,
+          rows: imported.slice(0, 5000).map((row) =>
+            Object.fromEntries(headers.map((header) => [header, String(row[header as keyof Row] ?? "")]))
+          )
+        });
+      }
       setRows(imported);
       setCountry(imported[0].country);
       setCrop("All crops");
@@ -251,6 +270,10 @@ export default function Home() {
       setUploadMessage(`Python analytics cleaned ${result.quality.records_after} valid rows and refreshed all charts.`);
       return;
     } catch (backendError) {
+      if (isPdf) {
+        setUploadMessage(backendError instanceof Error ? backendError.message : "Could not read this PDF.");
+        return;
+      }
       console.warn("FastAPI upload unavailable; using browser validation fallback.", backendError);
     }
     Papa.parse<Record<string, string>>(file, {
@@ -601,8 +624,8 @@ function Visualizations({ rows, filtered, byCrop, chartType, setChartType, loadi
 }
 
 function KpiCard({ label, value, detail, trend }: { label: string; value: string; detail: string; trend?: number }) { return <div className="kpi-card"><p>{label}</p><strong>{value}</strong><small>{trend !== undefined && <span className={trend >= 0 ? "positive" : "negative"}>{trend >= 0 ? "↑" : "↓"} {Math.abs(trend).toFixed(1)}% </span>}{detail}</small></div>; }
-function ImportPanel({ upload, message, rowCount, source, preview }: { upload: (file: File) => void; message: string; rowCount: number; source: string; preview: UploadedPreview | null }) { const uploadControl = <label className="upload-button compact-upload"><FileUp size={16} /> Replace CSV file<input type="file" accept=".csv,text/csv" onChange={(e) => e.target.files?.[0] && upload(e.target.files[0])} /></label>;
-return <div className="panel-stack">{preview ? <section className="card spreadsheet-card"><div className="spreadsheet-heading"><div><p className="eyebrow">UPLOADED DATA</p><h2><FileSpreadsheet size={19} /> {preview.fileName}</h2><p>{preview.rows.length.toLocaleString()} rows shown · {preview.headers.length} columns · scroll to inspect the file</p></div>{uploadControl}</div><div className="spreadsheet-wrap"><table className="spreadsheet-table"><thead><tr>{preview.headers.map((header) => <th key={header}>{header}</th>)}</tr></thead><tbody>{preview.rows.map((row, rowIndex) => <tr key={`${preview.fileName}-${rowIndex}`}>{preview.headers.map((header) => <td key={`${rowIndex}-${header}`}>{row[header] || "—"}</td>)}</tr>)}</tbody></table></div>{preview.rows.length === 5000 && <p className="spreadsheet-note">Showing the first 5,000 rows for a responsive preview. All valid rows are still used for analysis.</p>}</section> : <section className="card import-card"><div className="upload-icon"><Upload size={24} /></div><p className="eyebrow">DATA WORKBENCH</p><h2>Bring your field data to life</h2><p>Upload a CSV with at least <b>Year</b> and <b>Production</b> columns. Every chart, KPI, forecast, recommendation, and methodology note will recalculate from the uploaded rows.</p><label className="upload-button"><FileUp size={17} /> Choose CSV file<input type="file" accept=".csv,text/csv" onChange={(e) => e.target.files?.[0] && upload(e.target.files[0])} /></label></section>}{message && <div className="alert success">{message}</div>}<div className="kpi-grid import-stats"><KpiCard label="Active records" value={rowCount.toLocaleString()} detail="Rows currently powering the app" /><KpiCard label="Active source" value={source.startsWith("Uploaded") ? "Your CSV" : "OWID"} detail="Traceable dataset context" /><KpiCard label="Refresh behavior" value="Instant" detail="Charts update after validation" /><KpiCard label="Quality gate" value="Enabled" detail="Invalid rows are excluded" /></div><section className="card"><div className="card-heading"><div><h2>Data quality rules</h2><p>Applied before the dataset becomes active</p></div></div><div className="quality-list"><div><span>01</span><b>Schema validation</b><p>Checks required Year and Production columns.</p></div><div><span>02</span><b>Numeric validation</b><p>Removes non-numeric years, negative production, and malformed values.</p></div><div><span>03</span><b>Missing values</b><p>Incomplete rows are excluded and the valid-row count is reported.</p></div><div><span>04</span><b>Full recalculation</b><p>Recommendations and methodology update from the same active dataset.</p></div></div></section></div>; }
+function ImportPanel({ upload, message, rowCount, source, preview }: { upload: (file: File) => void; message: string; rowCount: number; source: string; preview: UploadedPreview | null }) { const uploadControl = <label className="upload-button compact-upload"><FileUp size={16} /> Replace data file<input type="file" accept=".csv,text/csv,.pdf,application/pdf" onChange={(e) => e.target.files?.[0] && upload(e.target.files[0])} /></label>;
+return <div className="panel-stack">{preview ? <section className="card spreadsheet-card"><div className="spreadsheet-heading"><div><p className="eyebrow">UPLOADED DATA</p><h2><FileSpreadsheet size={19} /> {preview.fileName}</h2><p>{preview.rows.length.toLocaleString()} rows shown · {preview.headers.length} columns · scroll to inspect the file</p></div>{uploadControl}</div><div className="spreadsheet-wrap"><table className="spreadsheet-table"><thead><tr>{preview.headers.map((header) => <th key={header}>{header}</th>)}</tr></thead><tbody>{preview.rows.map((row, rowIndex) => <tr key={`${preview.fileName}-${rowIndex}`}>{preview.headers.map((header) => <td key={`${rowIndex}-${header}`}>{row[header] || "—"}</td>)}</tr>)}</tbody></table></div>{preview.rows.length === 5000 && <p className="spreadsheet-note">Showing the first 5,000 rows for a responsive preview. All valid rows are still used for analysis.</p>}</section> : <section className="card import-card"><div className="upload-icon"><Upload size={24} /></div><p className="eyebrow">DATA WORKBENCH</p><h2>Bring your field data to life</h2><p>Upload a CSV or a text-based PDF with at least <b>Year</b> and <b>Production</b> columns. Scanned/image-only PDFs are not supported.</p><label className="upload-button"><FileUp size={17} /> Choose CSV or PDF file<input type="file" accept=".csv,text/csv,.pdf,application/pdf" onChange={(e) => e.target.files?.[0] && upload(e.target.files[0])} /></label></section>}{message && <div className="alert success">{message}</div>}<div className="kpi-grid import-stats"><KpiCard label="Active records" value={rowCount.toLocaleString()} detail="Rows currently powering the app" /><KpiCard label="Active source" value={source.startsWith("Uploaded") ? "Your file" : "OWID"} detail="Traceable dataset context" /><KpiCard label="Refresh behavior" value="Instant" detail="Charts update after validation" /><KpiCard label="Quality gate" value="Enabled" detail="Invalid rows are excluded" /></div><section className="card"><div className="card-heading"><div><h2>Data quality rules</h2><p>Applied before the dataset becomes active</p></div></div><div className="quality-list"><div><span>01</span><b>Schema validation</b><p>Checks required Year and Production columns.</p></div><div><span>02</span><b>Numeric validation</b><p>Removes non-numeric years, negative production, and malformed values.</p></div><div><span>03</span><b>Missing values</b><p>Incomplete rows are excluded and the valid-row count is reported.</p></div><div><span>04</span><b>Full recalculation</b><p>Recommendations and methodology update from the same active dataset.</p></div></div></section></div>; }
 function Forecast({ yearly }: { yearly: { name: number; production: number }[] }) { const window = yearly.slice(-5); const average = window.length ? window.reduce((s, r) => s + r.production, 0) / window.length : 0; const lastYear = yearly.at(-1)?.name ?? DATA_START_YEAR; const futureYears = Array.from({ length: Math.max(0, DATA_END_YEAR - lastYear) }, (_, index) => lastYear + index + 1); const data = [...yearly.slice(-10).map((r) => ({ ...r, kind: "Historical" })), ...futureYears.map((name) => ({ name, production: average, kind: "Forecast" }))]; return <div className="panel-stack"><section className="card chart-card forecast-card"><div className="card-heading"><div><h2>Baseline forecast</h2><p>Five-year moving average · selected geography and crop filters</p></div><span className="method-tag">MOVING AVERAGE</span></div><div className="chart"><ResponsiveContainer width="100%" height="100%"><LineChart data={data}><CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e7ece8" /><XAxis dataKey="name" tick={{ fontSize: 11 }} /><YAxis tickFormatter={compact} tick={{ fontSize: 11 }} /><Tooltip formatter={(v: number) => [formatNumber(v) + " t", "Production"]} /><Line dataKey="production" stroke="#237b59" strokeWidth={3} dot={{ r: 2 }} /></LineChart></ResponsiveContainer></div></section><div className="two-col"><div className="card metric-card"><p>Next-year baseline</p><strong>{formatNumber(average)} t</strong><small>{futureYears.length ? `Forecast through ${futureYears.at(-1)}` : "Latest available year is at the requested end year"}</small></div><div className="card limitation"><b>Model limitation</b><p>This is a transparent baseline, not a guaranteed outcome. It does not model weather, prices, policy, area changes, or shocks. Use chronological holdout testing before making operational decisions.</p></div></div></div>; }
 function Kpi({ filtered, total, growth, concentration, targetGrowth, setTargetGrowth }: { filtered: Row[]; total: number; growth: number; concentration: number; targetGrowth: number; setTargetGrowth: (v: number) => void }) {
   const sum = (key: keyof Row) => filtered.reduce((value, row) => value + (typeof row[key] === "number" ? row[key] as number : 0), 0);

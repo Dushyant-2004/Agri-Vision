@@ -6,7 +6,7 @@ AgriVision is an internship portfolio project that converts crop-production data
 
 - Live default data from Our World in Data Grapher, with FAOSTAT documented as the underlying source.
 - Default crop-production charts use the 2000–2026 analysis window; historical values stop at the latest year published by the source, and the Forecasting workspace labels baseline estimates through 2026 separately.
-- CSV upload with schema validation and cleaning for missing, duplicate, malformed, and negative-production records.
+- CSV and text-based PDF upload with schema validation and cleaning for missing, duplicate, malformed, and negative-production records.
 - Overview and visualization workspaces with trend, bar, histogram, ranked comparison, donut distribution, geography, and growth-rate charts.
 - Filters for geography, crop, and year.
 - Chronological moving-average forecasting with limitations clearly explained.
@@ -137,7 +137,7 @@ The current dependency lockfile is audited with zero production vulnerabilities.
 ## Backend API
 
 - `GET /health` — service health check.
-- `POST /api/data/upload` — clean and activate an uploaded CSV.
+- `POST /api/data/upload` — clean and activate an uploaded CSV or text-based PDF. PDFs must contain selectable table text with Year and Production columns; scanned/image-only PDFs are not supported.
 - `GET /api/data/summary` — active dataset summary.
 - `GET /api/data/trends` — yearly production trends.
 - `GET /api/forecast` — chronological forecast and error metrics.
@@ -145,7 +145,7 @@ The current dependency lockfile is audited with zero production vulnerabilities.
 - `GET /api/recommendations` — rule-based recommendations.
 - `GET /api/methodology` — active dataset methodology details.
 
-Uploading a new CSV replaces the active in-memory dataset. All subsequent analytics use the cleaned uploaded data.
+Uploading a new CSV or PDF replaces the active in-memory dataset. All subsequent analytics use the cleaned uploaded data.
 
 ## CSV format
 

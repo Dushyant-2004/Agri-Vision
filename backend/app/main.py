@@ -10,11 +10,12 @@ from typing import Any, Annotated
 import httpx
 import pandas as pd
 import os
+from pypdf.errors import PdfReadError
 from pathlib import Path
 from fastapi import FastAPI, File, HTTPException, Query, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 
-from .analytics import clean_csv, filter_frame, forecast, kpis, recommendations, summary, trends
+from .analytics import clean_csv, clean_pdf, filter_frame, forecast, kpis, recommendations, summary, trends
 
 COUNTRY_NAMES = {
     "afghanistan": "AF", "australia": "AU", "bangladesh": "BD", "brazil": "BR",
@@ -123,13 +124,17 @@ async def health() -> dict:
 @app.post("/api/data/upload")
 async def upload_data(file: Annotated[UploadFile, File(...)]) -> dict:
     global active_frame, active_source, active_quality
-    if not file.filename or not file.filename.lower().endswith(".csv"):
-        raise HTTPException(status_code=400, detail="Only CSV files are supported.")
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="Please choose a CSV or PDF file.")
+    extension = file.filename.lower().rsplit(".", 1)[-1]
+    if extension not in {"csv", "pdf"}:
+        raise HTTPException(status_code=400, detail="Only CSV and PDF files are supported.")
     try:
-        active_frame, active_quality = clean_csv(await file.read())
-    except (ValueError, pd.errors.ParserError) as error:
+        cleaner = clean_pdf if extension == "pdf" else clean_csv
+        active_frame, active_quality = cleaner(await file.read())
+    except (ValueError, pd.errors.ParserError, PdfReadError) as error:
         raise HTTPException(status_code=422, detail=str(error)) from error
-    active_source = f"Uploaded CSV · {file.filename}"
+    active_source = f"Uploaded {extension.upper()} · {file.filename}"
     active_quality["source"] = active_source
     return {
         "source": active_source,

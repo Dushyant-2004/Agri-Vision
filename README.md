@@ -1,153 +1,120 @@
-# AgriVision — Smart Agribusiness Analytics Dashboard
+# AgriVision
 
-AgriVision is an internship portfolio project that converts crop-production data into transparent visualizations, forecasts, KPI evaluations, and evidence-based recommendations. The interface is designed around a clean agribusiness workspace with KPI cards, ranked comparisons, distribution charts, and decision-ready exports.
+AgriVision is a smart agribusiness analytics dashboard for exploring crop-production data, evaluating operational KPIs, and producing decision-ready reports. It combines a Next.js frontend with a FastAPI analytics service and uses live Our World in Data (OWID) Grapher data by default.
 
-## Features
+## What it includes
 
-- Live default data from Our World in Data Grapher, with FAOSTAT documented as the underlying source.
-- Default crop-production charts use the 2000–2026 analysis window; historical values stop at the latest year published by the source, and the Forecasting workspace labels baseline estimates through 2026 separately.
-- CSV and text-based PDF upload with schema validation and cleaning for missing, duplicate, malformed, and negative-production records.
-- Overview and visualization workspaces with trend, bar, histogram, ranked comparison, donut distribution, geography, and growth-rate charts.
+- Production overview with KPI cards, trends, ranked comparisons, crop concentration, and geography.
+- Visualization workspace with line, bar, histogram, distribution, and growth-rate views.
 - Filters for geography, crop, and year.
-- Chronological moving-average forecasting with limitations clearly explained.
+- CSV and selectable-text PDF import with validation, cleaning, duplicate removal, and data-quality reporting.
+- Five-year moving-average forecasts with chronological holdout error metrics.
 - KPI evaluation for production, growth, concentration, yield, revenue, costs, profit, farmer income, water productivity, sustainability, and weather-risk availability.
-- Rule-based recommendations linked to the active dataset.
-- Methodology and data-source documentation inside the dashboard.
-- Weather workspace powered by OpenWeather when `OPENWEATHER_API_KEY` is configured.
-- Financial, report export, crop-health upload, and FAOSTAT market-price workspaces.
+- Rule-based recommendations based on the active dataset.
+- Weather workspace with location search, current conditions, five-day forecast, and an OpenStreetMap map.
+- Crop-health image screening through a configurable Groq vision model.
+- Financial and FAOSTAT market-price workspaces.
+- Filtered CSV downloads and printable production reports.
+- In-app methodology, source, formula, and limitation documentation.
 
 ## Technology
 
-- Frontend: Next.js 16, React, TypeScript, Recharts, Papa Parse, and CSS.
-- Backend: FastAPI, Pandas, NumPy, and scikit-learn.
-- Current persistence: one cleaned active dataset in backend memory.
-- Planned persistence: PostgreSQL.
+- **Frontend:** Next.js 16, React 18, TypeScript, Recharts, React Leaflet, Papa Parse, and CSS.
+- **Backend:** FastAPI, Uvicorn, Pandas, NumPy, scikit-learn, HTTPX, and pypdf.
+- **Default production data:** OWID Grapher crop-production CSVs for rice, maize, wheat, and soybeans; OWID identifies FAOSTAT as the underlying source.
+- **Persistence:** one cleaned active dataset held in backend memory. It is reset when the backend restarts.
 
 ## Requirements
 
-- Node.js 18 or newer
+- Node.js 20.9 or newer (required by Next.js 16)
 - npm
 - Python 3.10 or newer
-- Internet access for the default live OWID data
+- Internet access for OWID, weather, market-price, map-tile, and optional crop-health services
 
 ## Run locally
 
-Install frontend dependencies:
+### 1. Install frontend dependencies
 
 ```powershell
 cd "D:\Agri Vision"
-npm install
-```
-
-If dependencies were previously installed with an older Next.js version, restore the lockfile exactly:
-
-```powershell
 npm ci
 ```
 
-Install backend dependencies:
+Use `npm install` instead when setting up from a changed dependency manifest.
+
+### 2. Install backend dependencies
 
 ```powershell
 cd "D:\Agri Vision\backend"
-& "C:\Users\Dushy\AppData\Local\Programs\Python\Python310\python.exe" -m pip install -r requirements.txt
+& "..\.venv\Scripts\python.exe" -m pip install -r requirements.txt
 ```
 
-Start the backend in the first PowerShell window:
+Any Python 3.10+ interpreter may be used if the repository virtual environment is not available.
+
+### 3. Start the backend
+
+In the first PowerShell window:
 
 ```powershell
 cd "D:\Agri Vision\backend"
 .\run.ps1
 ```
 
-Start the frontend in a second PowerShell window:
+The API starts at http://127.0.0.1:8000. Interactive documentation is available at http://127.0.0.1:8000/docs.
+
+### 4. Start the frontend
+
+In a second PowerShell window:
 
 ```powershell
 cd "D:\Agri Vision"
 npm run dev
 ```
 
-Open the dashboard at http://localhost:3000.
+Open http://localhost:3000. The frontend uses `http://127.0.0.1:8000` as its default backend URL. To change it, copy [.env.example](.env.example) to `.env.local` and set `NEXT_PUBLIC_API_URL`.
 
-Open the interactive API documentation at http://127.0.0.1:8000/docs.
+If the backend is unavailable, CSV uploads can use the browser-side validation fallback. PDF uploads and backend-powered weather, crop-health, and market-price features require the API.
 
-Run the backend automated tests:
+## Optional services
 
-```powershell
-cd "D:\Agri Vision\backend"
-& "..\.venv\Scripts\python.exe" -m pytest
-```
-
-The test suite covers CSV cleaning and validation, filter behavior, forecast
-minimum-data handling, optional KPI availability, upload validation, and the
-health endpoint.
-
-The frontend uses `http://127.0.0.1:8000` by default. To use another API URL, copy `.env.example` to `.env.local` and set `NEXT_PUBLIC_API_URL`. If the backend is unavailable, the frontend uses its local CSV validation fallback.
-
-For live weather, set `OPENWEATHER_API_KEY` in `backend/.env`. This file is ignored by Git and loaded automatically by the backend. Keep the key backend-only; do not expose it as a `NEXT_PUBLIC_` variable or commit it to the repository:
+Keep secrets in the ignored `backend/.env` file. Never expose them through a `NEXT_PUBLIC_` variable or commit them.
 
 ```powershell
-Set-Content -Path "backend\.env" -Value 'OPENWEATHER_API_KEY=your-openweather-api-key'
+Set-Content -Path "backend\.env" -Value @"
+OPENWEATHER_API_KEY=your-openweather-api-key
+GROQ_API_KEY=your-groq-api-key
+# Optional: use another vision model available to your Groq account.
+GROQ_VISION_MODEL=qwen/qwen3.8-27b
+"@
 ```
 
-For crop-health image analysis, set `GROQ_API_KEY` in `backend/.env`. The backend uses `qwen/qwen3.8-27b` by default because it supports image input; override it with `GROQ_VISION_MODEL` if your Groq account uses another available vision model. Crop health provides AI-assisted screening guidance, not a laboratory diagnosis.
+- `OPENWEATHER_API_KEY` enables the Weather workspace.
+- `GROQ_API_KEY` enables crop-health image screening. The default model is configurable with `GROQ_VISION_MODEL`.
+- The market-price workspace uses public FAOSTAT producer-price data and a DBnomics catalog fallback when FAOSTAT is rate-limited.
 
-The market-price workspace uses the public FAOSTAT producer-price endpoint and may be unavailable when FAOSTAT is rate-limited.
-
-## Screenshots
-
-### Login and workspace entry
-
-![AgriVision login page](public/login.png)
-
-### Production dashboard
-
-![AgriVision production dashboard](public/dashboard.png)
-
-### Visualization workspace
-
-![AgriVision visualizations](public/visualizations.png)
-
-The screenshots are generated from the local production build using the public OWID/FAOSTAT data source. They are included to make the visual direction and chart layout easy to review without running the app.
-
-## Demo video
-
-The repository currently includes the screenshot walkthrough above but does not commit a recorded video file. To record a current demo locally, run `npm run dev`, open `http://localhost:3000`, and use the browser or operating-system screen recorder while moving through **Overview**, **Visualizations**, **Forecasting**, and **Reports**. This keeps the demo aligned with the current data and avoids committing a stale or oversized recording to the repository.
-
-## Production run
-
-```powershell
-cd "D:\Agri Vision"
-npm run build
-npm start
-```
-
-If the browser shows `GET / 404` or `/_next/static/... 404` after a rebuild, stop any older `next start` or `next dev` process and start only one server. Next.js build output is intentionally separated by `next.config.mjs`: production uses `.next`, while development uses `.next-dev`. Starting an old process against a replaced build can make its HTML reference chunks that no longer exist.
-
-## Validation and security
-
-Run the production checks before sharing a build:
-
-```powershell
-npm run build
-npm audit --omit=dev
-```
-
-The current dependency lockfile is audited with zero production vulnerabilities. Do not use `npm audit fix --force` casually in unrelated work because it can introduce a major framework upgrade; review the resulting build whenever dependency remediation is required.
+Crop-health results are AI-assisted visual screening guidance, not a laboratory diagnosis. The service rejects non-image uploads and images larger than 10 MB.
 
 ## Backend API
 
-- `GET /health` — service health check.
-- `POST /api/data/upload` — clean and activate an uploaded CSV or text-based PDF. PDFs must contain selectable table text with Year and Production columns; scanned/image-only PDFs are not supported.
-- `GET /api/data/summary` — active dataset summary.
-- `GET /api/data/trends` — yearly production trends.
-- `GET /api/forecast` — chronological forecast and error metrics.
-- `GET /api/kpis` — calculated KPI values and availability statuses.
-- `GET /api/recommendations` — rule-based recommendations.
-- `GET /api/methodology` — active dataset methodology details.
+All analytics endpoints use the active dataset. The optional `country`, `crop`, and `year` query parameters filter results where supported.
 
-Uploading a new CSV or PDF replaces the active in-memory dataset. All subsequent analytics use the cleaned uploaded data.
+| Method | Route | Purpose |
+| --- | --- | --- |
+| `GET` | `/health` | Check service health |
+| `POST` | `/api/data/upload` | Clean and activate a CSV or selectable-text PDF |
+| `GET` | `/api/data/summary` | Return active source, quality, and summary |
+| `GET` | `/api/data/trends` | Return annual production trends |
+| `GET` | `/api/forecast` | Return moving-average forecast and error metrics; `horizon` is 1–10 |
+| `GET` | `/api/kpis` | Return KPI values and availability statuses |
+| `GET` | `/api/recommendations` | Return rule-based recommendations |
+| `GET` | `/api/methodology` | Return active methodology and limitations |
+| `POST` | `/api/crop-health/analyze` | Analyze an uploaded crop image through Groq |
+| `GET` | `/api/weather` | Return geocoded current weather and a five-day forecast |
+| `GET` | `/api/market-prices` | Return FAOSTAT producer-price data or catalog fallback |
 
-## CSV format
+Uploading a new CSV or PDF replaces the active in-memory dataset. All subsequent analytics use the cleaned upload.
+
+## Upload format
 
 Required columns:
 
@@ -165,7 +132,7 @@ Season
 Area
 ```
 
-Optional columns for extended KPI analysis:
+Optional KPI columns:
 
 ```text
 Quantity_Sold
@@ -184,75 +151,94 @@ Flood_Events
 Heatwave_Days
 ```
 
-Column names are matched flexibly by the backend. Missing optional fields are shown as unavailable; the application does not invent financial, sustainability, or weather values.
-
-## Data cleaning
+Column names are matched flexibly by the backend. Missing optional fields are reported as unavailable; the application does not invent financial, sustainability, or weather values.
 
 The upload pipeline:
 
-1. Checks that `Year` and `Production` are present.
-2. Converts numeric fields to numeric values.
-3. Removes rows with missing required values.
-4. Removes negative production and invalid years.
-5. Removes duplicate records.
-6. Preserves valid optional KPI fields.
-7. Reports records before and after cleaning.
+1. Requires `Year` and `Production`.
+2. Converts numeric fields and removes rows with missing required values.
+3. Removes negative production, invalid years, and duplicate records.
+4. Preserves valid optional KPI fields.
+5. Reports records received, retained, and removed by category.
 
-## Data source and methodology
+## Data and methodology
 
-The default dashboard loads rice, maize, wheat, and soybean production from the **Our World in Data Grapher**. OWID identifies FAOSTAT as the underlying source. OWID is a third-party presentation/mirror layer, not the official FAO application.
+The default dashboard downloads rice, maize, wheat, and soybean production from the [OWID agricultural production dataset](https://ourworldindata.org/agricultural-production). The default analysis window is 2000–2026; the latest historical year depends on what the source publishes. Forecast estimates are labeled separately from historical observations.
 
-Source documentation: https://ourworldindata.org/agricultural-production
+Key calculations:
 
-Forecasting uses a transparent five-year moving-average baseline. It is not a causal model and does not account for weather, prices, policy, land-area changes, or unexpected shocks. Production growth and crop concentration are descriptive indicators, not guarantees of future performance.
-
-Profit requires revenue and total cost. Yield requires production and positive cultivated area. Sustainability and weather-risk statuses depend on the corresponding uploaded fields. These metrics are intentionally not estimated when their required inputs are missing.
-
-The in-app Methodology page reports the active source, filter context, row coverage, units, data-quality results, formulas, forecast baseline, and KPI input availability. The quality gate requires `Year` and `Production`, converts numeric values, and excludes incomplete, malformed, negative, and duplicate records. For uploaded CSVs it also reports rows received, rows retained, and each removal category.
-
-The main formulas are:
-
-- Annual trend: sum of production grouped by year.
+- Annual trend: production summed by year.
 - Growth: `((latest annual total - first annual total) / first annual total) * 100`.
-- Crop concentration: `leading crop production / total production * 100`.
-- Yield: `production / positive cultivated area`, when `area` is provided.
-- Revenue: `revenue`, or `quantity_sold * selling_price` when both inputs are available.
+- Crop concentration: leading crop production divided by total production.
+- Yield: production divided by positive cultivated area.
+- Revenue: provided revenue, or `quantity_sold * selling_price`.
+- Forecast: average production across the latest five available years, repeated for the requested horizon.
 
-Forecasts repeat the average production from the latest five available years for the next three years. When enough annual observations exist, the latest historical observations are held out for a chronological baseline check and reported as a percentage error. This is a diagnostic estimate, not a confidence interval or causal forecast.
+Forecasting is a transparent baseline, not a causal model or confidence interval. It does not model weather, prices, policy, land-area changes, or unexpected shocks. Profitability, sustainability, and weather-risk metrics depend on the quality, units, and provenance of uploaded fields.
+
+## Test and production commands
+
+Run backend tests:
+
+```powershell
+cd "D:\Agri Vision\backend"
+& "..\.venv\Scripts\python.exe" -m pytest
+```
+
+The tests cover CSV cleaning, required-field validation, filtering, forecast minimum-data handling, optional KPI availability, upload validation, and the health endpoint.
+
+Build and run the frontend in production mode:
+
+```powershell
+cd "D:\Agri Vision"
+npm run build
+npm start
+```
+
+Run the production dependency audit:
+
+```powershell
+npm audit --omit=dev
+```
+
+Development output is written to `.next-dev`; production output is written to `.next`. Run only one Next.js server for a given build to avoid stale chunk errors.
 
 ## Project structure
 
 ```text
 Agri Vision/
 ├── app/
-│   ├── page.tsx
-│   ├── globals.css
-│   └── layout.tsx
+│   ├── page.tsx              # Dashboard UI and client-side fallback
+│   ├── location-map.tsx      # Leaflet map workspace
+│   ├── globals.css           # Dashboard styling
+│   └── layout.tsx            # Metadata and root layout
 ├── backend/
 │   ├── app/
-│   │   ├── analytics.py
-│   │   └── main.py
+│   │   ├── analytics.py      # Cleaning and analytics functions
+│   │   └── main.py           # FastAPI routes and external integrations
+│   ├── tests/                # Backend automated tests
 │   ├── requirements.txt
 │   └── run.ps1
+├── public/                   # Dashboard screenshots
 ├── .env.example
-├── .gitignore
 ├── next.config.mjs
 ├── package.json
 └── README.md
 ```
 
-## Security and repository hygiene
+## Limitations and next steps
 
-- Never commit `.env`, `.env.local`, API keys, passwords, certificates, private keys, or production configuration.
-- Do not commit uploaded farmer or operational datasets unless they are sanitized and explicitly intended for publication.
-- Keep dependencies installed locally and do not commit `node_modules`, Python virtual environments, caches, or build output.
-- Use environment variables for configurable API URLs and future database credentials.
-
-## Current limitations and next steps
-
-- The backend stores one active cleaned dataset in memory and loses it when restarted.
-- PostgreSQL persistence and user authentication are not implemented yet.
+- The backend has no persistent database; the active dataset is lost on restart.
+- Authentication is a local browser demo flow, not production user management.
 - Forecasts are baseline estimates and should not be treated as guaranteed outcomes.
-- Profitability and sustainability depend on the quality, units, and provenance of uploaded columns.
-- Add automated backend tests for cleaning, KPI availability, forecasting, and recommendation rules before deployment.
-# Agri-Vision
+- Optional financial, sustainability, and weather metrics require trustworthy input columns and units.
+- External services can be unavailable or rate-limited.
+- Add persistent storage, production authentication, and broader integration coverage before deployment.
+
+## Screenshots
+
+![AgriVision login page](public/login.png)
+
+![AgriVision production dashboard](public/dashboard.png)
+
+![AgriVision visualizations](public/visualizations.png)

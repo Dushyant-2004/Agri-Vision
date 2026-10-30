@@ -35,7 +35,7 @@ def _find_column(columns: list[str], *terms: str) -> str | None:
         lowered = column.lower().strip()
         if any(term in lowered for term in terms):
             return column
-    return None
+        return None
 
 
 def _clean_frame(frame: pd.DataFrame) -> tuple[pd.DataFrame, dict[str, Any]]:

@@ -11,7 +11,7 @@ type LeafletElement = HTMLDivElement & {
 
 
 
-export default function LocationMap({ latitude, longitude, location }: { latitude: number; longitude: number; location: string }) {
+ export default function LocationMap({ latitude, longitude, location }: { latitude: number; longitude: number; location: string }) {
   const mapElement = useRef<HTMLDivElement>(null);
   const markerIcon = useMemo(() => L.divIcon({
     className: "location-marker-icon",

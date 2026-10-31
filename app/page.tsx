@@ -517,7 +517,7 @@ function AuthScreen({
       <div className="auth-brand"><span className="auth-brand-mark"><Sprout size={23} /></span><span><b>AgriVision</b><small>AGRIBUSINESS ANALYTICS</small></span></div>
       <div className="auth-story-copy">
         <p className="eyebrow">GROW WITH CLARITY</p>
-        <h1>Better harvests start with better decisions.</h1>
+        <h1>Better harvests start with better approaches.</h1>
         <p>Turn field data into practical insight with a workspace built for modern agriculture teams.</p>
       </div>
       <div className="auth-feature-list">

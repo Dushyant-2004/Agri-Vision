@@ -12,6 +12,7 @@ AgriVision is a smart agribusiness analytics dashboard for exploring crop-produc
 - KPI evaluation for production, growth, concentration, yield, revenue, costs, profit, farmer income, water productivity, sustainability, and weather-risk availability.
 - Rule-based recommendations based on the active dataset.
 - Weather workspace with location search, current conditions, five-day forecast, and an OpenStreetMap map.
+- Farm profiles with locally saved farm metadata, field coordinates, crop and area details, and field-level map markers.
 - Crop-health image screening through a configurable Groq vision model.
 - Financial and FAOSTAT market-price workspaces.
 - Filtered CSV downloads and printable production reports.
@@ -22,7 +23,7 @@ AgriVision is a smart agribusiness analytics dashboard for exploring crop-produc
 - **Frontend:** Next.js 16, React 18, TypeScript, Recharts, React Leaflet, Papa Parse, and CSS.
 - **Backend:** FastAPI, Uvicorn, Pandas, NumPy, scikit-learn, HTTPX, and pypdf.
 - **Default production data:** OWID Grapher crop-production CSVs for rice, maize, wheat, and soybeans; OWID identifies FAOSTAT as the underlying source.
-- **Persistence:** one cleaned active dataset held in backend memory. It is reset when the backend restarts.
+- **Persistence:** farm profiles are saved in browser local storage; one cleaned active dataset is held in backend memory and is reset when the backend restarts.
 
 ## Requirements
 

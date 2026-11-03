@@ -8,7 +8,8 @@ import {
   Gauge, LayoutDashboard, Lightbulb, Menu, Search, Settings2, Sprout,
   TrendingUp, Upload, UserCircle, LogOut, ChevronDown, X, CloudSun, WalletCards,
   FileText, FileSpreadsheet, Stethoscope, MapPin, SlidersHorizontal, RotateCcw,
-  ArrowUpRight, MapPinned, Plus, Trash2
+  ArrowUpRight, MapPinned, Plus, Trash2, AlertTriangle, Droplets, Thermometer,
+  Activity, ShieldAlert
 } from "lucide-react";
 import {
   Bar, BarChart, CartesianGrid, Cell, Line, LineChart, Pie, PieChart,
@@ -20,7 +21,7 @@ type Row = {
   area?: number; quantity_sold?: number; selling_price?: number; revenue?: number;
   total_cost?: number; farmer_income?: number; water_used?: number;
   fertilizer_used?: number; pesticide_used?: number; carbon_emissions?: number;
-  rainfall?: number; temperature?: number; drought_index?: number;
+  rainfall?: number; temperature?: number; humidity?: number; drought_index?: number;
   flood_events?: number; heatwave_days?: number;
 };
 type DataQuality = {
@@ -35,7 +36,7 @@ type UploadedPreview = {
   headers: string[];
   rows: Record<string, string>[];
 };
-type Section = "Overview" | "Data import" | "Visualizations" | "Forecasting" | "KPI evaluation" | "Recommendations" | "Methodology" | "Weather" | "Financials" | "Reports" | "Crop health" | "Farm profiles";
+type Section = "Overview" | "Data import" | "Visualizations" | "Forecasting" | "KPI evaluation" | "Recommendations" | "Methodology" | "Weather" | "Weather impact" | "Financials" | "Reports" | "Crop health" | "Farm profiles";
 type AuthMode = "login" | "signup";
 type FarmField = {
   id: string;
@@ -314,14 +315,27 @@ export default function Home() {
     Papa.parse<Record<string, string>>(file, {
       header: true, skipEmptyLines: true,
       complete: (result) => {
-        const yearKey = Object.keys(result.data[0] ?? {}).find((h) => h.toLowerCase().includes("year"));
-        const productionKey = Object.keys(result.data[0] ?? {}).find((h) => h.toLowerCase().includes("production") || h.toLowerCase().includes("yield"));
-        const cropKey = Object.keys(result.data[0] ?? {}).find((h) => h.toLowerCase().includes("crop"));
+        const headers = Object.keys(result.data[0] ?? {});
+        const findKey = (...terms: string[]) => headers.find((header) => terms.some((term) => header.toLowerCase().includes(term)));
+        const yearKey = findKey("year");
+        const productionKey = findKey("production", "yield");
+        const cropKey = findKey("crop");
+        const numberValue = (row: Record<string, string>, terms: string[]) => {
+          const key = findKey(...terms);
+          const value = key ? Number(String(row[key]).replace(/,/g, "")) : undefined;
+          return value !== undefined && Number.isFinite(value) ? value : undefined;
+        };
         if (!yearKey || !productionKey) { setUploadMessage("Validation failed: CSV needs Year and Production columns."); return; }
         const imported = result.data.map((r) => ({
           country: r.State || r.state || r.Country || r.country || "Uploaded dataset",
           year: Number(r[yearKey]), crop: r[cropKey ?? "Crop"] || "Uploaded crop",
-          production: Number(String(r[productionKey]).replace(/,/g, ""))
+          production: Number(String(r[productionKey]).replace(/,/g, "")),
+          rainfall: numberValue(r, ["rainfall"]),
+          temperature: numberValue(r, ["temperature"]),
+          humidity: numberValue(r, ["humidity", "relative_humidity"]),
+          drought_index: numberValue(r, ["drought_index", "drought"]),
+          flood_events: numberValue(r, ["flood_events", "flood"]),
+          heatwave_days: numberValue(r, ["heatwave_days", "heatwave"])
         })).filter((r) => Number.isFinite(r.year) && Number.isFinite(r.production) && r.production >= 0);
         if (!imported.length) {
           setUploadMessage("Validation failed: no valid rows were found in this CSV.");
@@ -430,6 +444,7 @@ export default function Home() {
     { label: "Recommendations", icon: <Lightbulb size={18} /> },
     { label: "Methodology", icon: <BookOpen size={18} /> },
     { label: "Weather", icon: <CloudSun size={18} /> },
+    { label: "Weather impact", icon: <Activity size={18} /> },
     { label: "Financials", icon: <WalletCards size={18} /> },
     { label: "Reports", icon: <FileText size={18} /> },
     { label: "Crop health", icon: <Stethoscope size={18} /> },
@@ -449,7 +464,7 @@ export default function Home() {
         {error && <div className="alert error">{error} Check your internet connection and reload.</div>}
         <div className="page-heading"><div><p className="eyebrow">AGRICULTURAL INTELLIGENCE · 2026</p><h1>{section === "Overview" ? "Production overview" : section}</h1><p className="subtitle">{section === "Overview" ? "Turn production data into decisions you can defend." : "Explore the evidence behind your agribusiness decisions."}</p><p className="data-source">Source: <b>{dataSource}</b> · Requested window {DATA_START_YEAR}–{DATA_END_YEAR} · Latest available {latestYear ?? "—"}{lastUpdated && <> · Updated {lastUpdated.toLocaleTimeString()}</>}</p></div></div>
         {section === "Overview" && <div className="filter-toolbar" aria-label="Overview filters"><div className="filter-toolbar-title"><SlidersHorizontal size={16} /><span>Refine view</span></div><label>Geography<select value={country} onChange={(event) => setCountry(event.target.value)}><option>All geographies</option>{countries.map((value) => <option key={value}>{value}</option>)}</select></label><label>Crop<select value={crop} onChange={(event) => setCrop(event.target.value)}><option>All crops</option>{crops.map((value) => <option key={value}>{value}</option>)}</select></label><label>Year<select value={year} onChange={(event) => setYear(event.target.value)}><option>All years</option>{years.map((value) => <option key={value}>{value}</option>)}</select></label><button className="toolbar-reset" type="button" onClick={() => { setCountry("All geographies"); setCrop("All crops"); setYear("All years"); }}><RotateCcw size={14} /> Reset</button><button className="toolbar-export" type="button" onClick={downloadCsv}><CloudDownload size={15} /> Export view</button></div>}
-        {section === "Data import" ? <ImportPanel upload={upload} message={uploadMessage} rowCount={rows.length} source={dataSource} preview={uploadedPreview} /> : section === "Methodology" ? <Methodology rows={rows} filtered={filtered} source={dataSource} lastUpdated={lastUpdated} quality={quality} /> : section === "Forecasting" ? <Forecast yearly={yearly} /> : section === "KPI evaluation" ? <Kpi filtered={filtered} total={total} growth={growth} concentration={concentration} targetGrowth={targetGrowth} setTargetGrowth={setTargetGrowth} /> : section === "Recommendations" ? <Recommendations filtered={filtered} growth={growth} concentration={concentration} targetGrowth={targetGrowth} crop={byCrop[0]?.name} /> : section === "Visualizations" ? <Visualizations rows={rows} filtered={filtered} byCrop={byCrop} chartType={visualChart} setChartType={setVisualChart} loading={loading} /> : section === "Weather" ? <WeatherPanel city={weatherCity} setCity={setWeatherCity} weather={weather} error={weatherError} load={loadWeather} /> : section === "Financials" ? <FinancialPanel filtered={filtered} total={total} /> : section === "Reports" ? <ReportsPanel printReport={printReport} downloadCsv={downloadCsv} /> : section === "Crop health" ? <DiseasePanel image={diseaseImage} setImage={setDiseaseImage} /> : section === "Farm profiles" ? <FarmProfiles farms={farms} selectedFarmId={selectedFarmId} setSelectedFarmId={setSelectedFarmId} saveFarms={saveFarms} /> : <Dashboard filtered={filtered} yearly={yearly} byCrop={byCrop} total={total} countries={countries} years={years} latestYear={latestYear} firstYear={firstYear} growth={growth} concentration={concentration} loading={loading} onOpenSection={setSection} />}
+        {section === "Data import" ? <ImportPanel upload={upload} message={uploadMessage} rowCount={rows.length} source={dataSource} preview={uploadedPreview} /> : section === "Methodology" ? <Methodology rows={rows} filtered={filtered} source={dataSource} lastUpdated={lastUpdated} quality={quality} /> : section === "Forecasting" ? <Forecast yearly={yearly} /> : section === "KPI evaluation" ? <Kpi filtered={filtered} total={total} growth={growth} concentration={concentration} targetGrowth={targetGrowth} setTargetGrowth={setTargetGrowth} /> : section === "Recommendations" ? <Recommendations filtered={filtered} growth={growth} concentration={concentration} targetGrowth={targetGrowth} crop={byCrop[0]?.name} /> : section === "Visualizations" ? <Visualizations rows={rows} filtered={filtered} byCrop={byCrop} chartType={visualChart} setChartType={setVisualChart} loading={loading} /> : section === "Weather" ? <WeatherPanel city={weatherCity} setCity={setWeatherCity} weather={weather} error={weatherError} load={loadWeather} /> : section === "Weather impact" ? <WeatherImpactPanel rows={filtered} weather={weather} upload={upload} /> : section === "Financials" ? <FinancialPanel filtered={filtered} total={total} /> : section === "Reports" ? <ReportsPanel printReport={printReport} downloadCsv={downloadCsv} /> : section === "Crop health" ? <DiseasePanel image={diseaseImage} setImage={setDiseaseImage} /> : section === "Farm profiles" ? <FarmProfiles farms={farms} selectedFarmId={selectedFarmId} setSelectedFarmId={setSelectedFarmId} saveFarms={saveFarms} /> : <Dashboard filtered={filtered} yearly={yearly} byCrop={byCrop} total={total} countries={countries} years={years} latestYear={latestYear} firstYear={firstYear} growth={growth} concentration={concentration} loading={loading} onOpenSection={setSection} />}
       </div>
     </main>
   </div>;
@@ -515,6 +530,69 @@ function FarmProfiles({ farms, selectedFarmId, setSelectedFarmId, saveFarms }: {
    </div>
    {selectedFarm && <><section className="farm-detail-header"><div><p className="eyebrow">ACTIVE FARM</p><h2>{selectedFarm.name}</h2><p>{selectedFarm.location} · Managed by {selectedFarm.owner}</p></div><button className="danger-button" type="button" onClick={removeFarm}><Trash2 size={15} /> Delete farm</button></section><section className="farm-map-grid"><div className="card farm-map-card"><div className="card-heading"><div><h2>Field map</h2><p>Markers show the coordinates saved for this farm.</p></div><span className="live-tag">{selectedFarm.fields.length} FIELDS</span></div>{selectedFarm.fields.length ? <LocationMap latitude={selectedFarm.fields[0].latitude} longitude={selectedFarm.fields[0].longitude} location={selectedFarm.name} fields={selectedFarm.fields} /> : <div className="map-empty"><MapPinned size={26} /><p>Add a field with latitude and longitude to place it on the map.</p></div>}</div><section className="card field-form-card"><p className="eyebrow">ADD FIELD</p><h2>Field details</h2><form className="farm-form" onSubmit={addField}><label>Field name<input name="fieldName" placeholder="North field" required /></label><label>Crop<input name="fieldCrop" placeholder="Rice" required /></label><div className="form-two-col"><label>Area (hectares)<input name="fieldArea" type="number" min="0.1" step="0.1" placeholder="12.5" required /></label><label>Latitude<input name="fieldLatitude" type="number" step="any" min="-90" max="90" placeholder="18.5204" required /></label></div><label>Longitude<input name="fieldLongitude" type="number" step="any" min="-180" max="180" placeholder="73.8567" required /></label><button className="primary-button" type="submit"><Plus size={16} /> Add field</button></form></section></section><section className="card table-card"><div className="card-heading"><div><h2>Fields in {selectedFarm.name}</h2><p>Field-level metadata for planning and map-based monitoring.</p></div></div><div className="table-wrap"><table><thead><tr><th>Field</th><th>Crop</th><th>Area</th><th>Coordinates</th><th></th></tr></thead><tbody>{selectedFarm.fields.length ? selectedFarm.fields.map((field) => <tr key={field.id}><td><b>{field.name}</b></td><td>{field.crop}</td><td>{field.area.toLocaleString()} ha</td><td>{field.latitude.toFixed(4)}, {field.longitude.toFixed(4)}</td><td className="right"><button className="icon-button" type="button" title={`Remove ${field.name}`} onClick={() => removeField(field.id)}><Trash2 size={15} /></button></td></tr>) : <tr><td colSpan={5}>No fields added yet.</td></tr>}</tbody></table></div></section></>}
  </div>;
+}
+
+function correlation(valuesA: number[], valuesB: number[]) {
+  if (valuesA.length < 2 || valuesA.length !== valuesB.length) return 0;
+  const meanA = valuesA.reduce((sum, value) => sum + value, 0) / valuesA.length;
+  const meanB = valuesB.reduce((sum, value) => sum + value, 0) / valuesB.length;
+  const numerator = valuesA.reduce((sum, value, index) => sum + (value - meanA) * (valuesB[index] - meanB), 0);
+  const denominatorA = Math.sqrt(valuesA.reduce((sum, value) => sum + (value - meanA) ** 2, 0));
+  const denominatorB = Math.sqrt(valuesB.reduce((sum, value) => sum + (value - meanB) ** 2, 0));
+  return denominatorA && denominatorB ? numerator / (denominatorA * denominatorB) : 0;
+}
+
+function WeatherImpactPanel({ rows, weather, upload }: { rows: Row[]; weather: { location: string; current: { temperature: number; humidity: number; rainfall: number } } | null; upload: (file: File) => void }) {
+  const analysis = useMemo(() => {
+    const weatherRows = rows.filter((row) =>
+      [row.rainfall, row.temperature, row.humidity].some((value) => value !== undefined && Number.isFinite(value))
+    );
+    const rainfallRows = weatherRows.filter((row) => row.rainfall !== undefined && Number.isFinite(row.rainfall));
+    const temperatureRows = weatherRows.filter((row) => row.temperature !== undefined && Number.isFinite(row.temperature));
+    const rainfallCorrelation = correlation(rainfallRows.map((row) => row.rainfall!), rainfallRows.map((row) => row.production));
+    const temperatureCorrelation = correlation(temperatureRows.map((row) => row.temperature!), temperatureRows.map((row) => row.production));
+    const droughtRows = rows.filter((row) => (row.drought_index ?? 0) >= 0.6).length;
+    const floodRows = rows.filter((row) => (row.flood_events ?? 0) > 0).length;
+    const heatwaveRows = rows.filter((row) => (row.heatwave_days ?? 0) >= 5).length;
+    const riskPoints = Math.min(100, Math.round(
+      (droughtRows / Math.max(rows.length, 1)) * 45 +
+      (floodRows / Math.max(rows.length, 1)) * 30 +
+      (heatwaveRows / Math.max(rows.length, 1)) * 25
+    ));
+    const byYear = Array.from(new Set(weatherRows.map((row) => row.year))).sort((a, b) => a - b).map((year) => {
+      const yearRows = weatherRows.filter((row) => row.year === year);
+      const average = (key: "rainfall" | "temperature" | "humidity") => {
+        const values = yearRows.map((row) => row[key]).filter((value): value is number => value !== undefined && Number.isFinite(value));
+        return values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : null;
+      };
+      return {
+        year,
+        production: yearRows.reduce((sum, row) => sum + row.production, 0),
+        rainfall: average("rainfall"),
+        temperature: average("temperature"),
+        humidity: average("humidity")
+      };
+    });
+    return { weatherRows, rainfallRows, temperatureRows, rainfallCorrelation, temperatureCorrelation, droughtRows, floodRows, heatwaveRows, riskPoints, byYear };
+  }, [rows]);
+
+  const riskLabel = analysis.riskPoints >= 50 ? "Elevated" : analysis.riskPoints >= 20 ? "Watch" : "Low";
+  const correlationLabel = (value: number) => `${value >= 0 ? "+" : ""}${value.toFixed(2)}`;
+  return <div className="panel-stack">
+    <section className="visual-hero weather-impact-hero"><div><p className="eyebrow">WEATHER IMPACT ANALYSIS</p><h2>Turn climate signals into production decisions</h2><p>Compare rainfall, temperature and humidity with crop output, then prioritize drought, flood and heatwave risks.</p></div><ShieldAlert size={40} className="section-hero-icon" /></section>
+    {!analysis.weatherRows.length && <div className="alert weather-upload-alert"><b>Historical weather fields are not available in the active dataset.</b><p>Upload a CSV containing Year, Production, Rainfall, Temperature and optionally Humidity, Drought_index, Flood_events or Heatwave_days to unlock the analysis.</p><label className="upload-button weather-upload-button"><FileUp size={16} /> Upload weather CSV<input type="file" accept=".csv,text/csv" onChange={(event) => event.target.files?.[0] && upload(event.target.files[0])} /></label>{weather && <p>Live conditions for {weather.location}: {weather.current.temperature}°C, {weather.current.humidity}% humidity and {weather.current.rainfall} mm rainfall.</p>}</div>}
+    <section className="visual-kpi-grid weather-impact-kpis">
+      <div className="visual-kpi-card"><span className="visual-kpi-icon production"><Activity size={19} /></span><div><small>Weather-linked records</small><strong>{analysis.weatherRows.length.toLocaleString()}</strong><em>{analysis.rainfallRows.length} rainfall · {analysis.temperatureRows.length} temperature</em></div></div>
+      <div className="visual-kpi-card"><span className="visual-kpi-icon area"><Droplets size={19} /></span><div><small>Rainfall / yield link</small><strong>{correlationLabel(analysis.rainfallCorrelation)}</strong><em>Pearson correlation</em></div></div>
+      <div className="visual-kpi-card"><span className="visual-kpi-icon crops"><Thermometer size={19} /></span><div><small>Temperature / yield link</small><strong>{correlationLabel(analysis.temperatureCorrelation)}</strong><em>Pearson correlation</em></div></div>
+      <div className="visual-kpi-card"><span className="visual-kpi-icon states"><AlertTriangle size={19} /></span><div><small>Climate risk score</small><strong>{analysis.riskPoints}/100</strong><em className={analysis.riskPoints >= 50 ? "negative" : "positive"}>{riskLabel} exposure</em></div></div>
+    </section>
+    <section className="chart-grid weather-impact-chart-grid">
+      <section className="card chart-card wide"><div className="card-heading"><div><h2>Weather and production trend</h2><p>Annual averages and total production · active filters</p></div><span className="chart-badge">CORRELATION VIEW</span></div><div className="chart"><ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 800, height: 285 }}><LineChart data={analysis.byYear}><CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e7ece8" /><XAxis dataKey="year" tick={{ fontSize: 11, fill: "#718078" }} tickLine={false} axisLine={false} /><YAxis yAxisId="production" tick={{ fontSize: 11, fill: "#718078" }} tickLine={false} axisLine={false} tickFormatter={compact} /><YAxis yAxisId="weather" orientation="right" tick={{ fontSize: 11, fill: "#718078" }} tickLine={false} axisLine={false} /><Tooltip /><Line yAxisId="production" type="monotone" dataKey="production" name="Production (t)" stroke="#237b59" strokeWidth={3} dot={false} connectNulls /><Line yAxisId="weather" type="monotone" dataKey="rainfall" name="Rainfall (mm)" stroke="#4c82d4" strokeWidth={2} dot={false} connectNulls /><Line yAxisId="weather" type="monotone" dataKey="temperature" name="Temperature (°C)" stroke="#ed9d27" strokeWidth={2} dot={false} connectNulls /></LineChart></ResponsiveContainer></div></section>
+      <section className="card chart-card"><div className="card-heading"><div><h2>Risk drivers</h2><p>Records crossing alert thresholds</p></div></div><div className="risk-driver-list"><div><span><Droplets size={16} /> Drought exposure</span><b>{analysis.droughtRows}</b></div><div><span><AlertTriangle size={16} /> Flood events</span><b>{analysis.floodRows}</b></div><div><span><Thermometer size={16} /> Heatwave periods</span><b>{analysis.heatwaveRows}</b></div></div><div className={`risk-summary ${analysis.riskPoints >= 50 ? "high" : ""}`}><AlertTriangle size={16} /><span><b>{riskLabel} climate exposure</b><small>{analysis.weatherRows.length ? "Use the signal alongside field observations before changing inputs." : "Add historical weather data to calculate exposure."}</small></span></div></section>
+    </section>
+    <section className="card table-card"><div className="card-heading"><div><h2>What the correlations mean</h2><p>Directional signals, not proof of causation. Use them to guide investigation.</p></div></div><div className="impact-insight-grid"><div><b>Rainfall and yield</b><p>{analysis.rainfallRows.length > 1 ? `A ${correlationLabel(analysis.rainfallCorrelation)} relationship was observed across ${analysis.rainfallRows.length} records.` : "Add at least two rainfall observations to calculate this relationship."}</p></div><div><b>Temperature and yield</b><p>{analysis.temperatureRows.length > 1 ? `A ${correlationLabel(analysis.temperatureCorrelation)} relationship was observed across ${analysis.temperatureRows.length} records.` : "Add at least two temperature observations to calculate this relationship."}</p></div><div><b>Recommended next step</b><p>Combine weather alerts with farm-level irrigation, soil and pest observations before acting.</p></div></div></section>
+  </div>;
 }
 
 function WeatherPanel({ city, setCity, weather, error, load }: { city: string; setCity: (value: string) => void; weather: { location: string; updated: string; coordinates: { latitude: number; longitude: number }; sunrise: number; sunset: number; current: { temperature: number; feels_like: number; condition: string; humidity: number; pressure: number; visibility: number; clouds: number; rainfall: number; wind: number }; forecast: { date: string; temperature: number; rainfall: number; condition: string }[] } | null; error: string; load: () => void }) {

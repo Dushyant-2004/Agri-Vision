@@ -31,6 +31,20 @@ def test_clean_csv_requires_year_and_production():
         clean_csv(b"Country,Crop\nIndia,Rice\n")
 
 
+def test_clean_csv_normalizes_weather_columns():
+    raw = b"""Country,Crop,Year,Production,Rainfall,Temperature,Humidity
+India,Rice,2020,100,820,27.5,68
+India,Rice,2021,120,910,28.1,71
+"""
+
+    cleaned, _ = clean_csv(raw)
+
+    assert cleaned[["rainfall", "temperature", "humidity"]].to_dict("records") == [
+        {"rainfall": 820.0, "temperature": 27.5, "humidity": 68.0},
+        {"rainfall": 910.0, "temperature": 28.1, "humidity": 71.0},
+    ]
+
+
 def test_filter_frame_filters_country_crop_year():
     frame = pd.DataFrame(
         [
@@ -73,4 +87,3 @@ def test_kpis_reports_unavailable_optional_metrics():
     assert result["availability"]["profit"] == "not_available"
     assert result["availability"]["yield_per_hectare"] == "not_available"
     assert result["availability"]["weather_risk"] == "not_available"
-

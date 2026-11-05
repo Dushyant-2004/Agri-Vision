@@ -17,13 +17,14 @@ AgriVision is a smart agribusiness analytics dashboard for exploring crop-produc
 - Financial and FAOSTAT market-price workspaces.
 - Filtered CSV downloads and printable production reports.
 - In-app methodology, source, formula, and limitation documentation.
+- English, Hindi, and Punjabi interface localization with a persistent language selector.
 
 ## Technology
 
 - **Frontend:** Next.js 16, React 18, TypeScript, Recharts, React Leaflet, Papa Parse, and CSS.
 - **Backend:** FastAPI, Uvicorn, Pandas, NumPy, scikit-learn, HTTPX, and pypdf.
 - **Default production data:** OWID Grapher crop-production CSVs for rice, maize, wheat, and soybeans; OWID identifies FAOSTAT as the underlying source.
-- **Persistence:** farm profiles are saved in browser local storage; one cleaned active dataset is held in backend memory and is reset when the backend restarts.
+- **Persistence:** language selection and farm profiles are saved in browser local storage; one cleaned active dataset is held in backend memory and is reset when the backend restarts.
 
 ## Requirements
 

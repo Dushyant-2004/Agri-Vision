@@ -38,6 +38,7 @@ type UploadedPreview = {
 };
 type Section = "Overview" | "Data import" | "Visualizations" | "Forecasting" | "KPI evaluation" | "Recommendations" | "Methodology" | "Weather" | "Weather impact" | "Financials" | "Reports" | "Crop health" | "Farm profiles";
 type AuthMode = "login" | "signup";
+type Language = "en" | "hi" | "pa";
 type FarmField = {
   id: string;
   name: string;
@@ -53,6 +54,85 @@ type FarmProfile = {
   owner: string;
   fields: FarmField[];
 };
+
+const LANGUAGE_OPTIONS: { value: Language; label: string }[] = [
+  { value: "en", label: "English" },
+  { value: "hi", label: "हिन्दी" },
+  { value: "pa", label: "ਪੰਜਾਬੀ" }
+];
+
+const translations: Record<Language, Record<string, string>> = {
+  en: {},
+  hi: {
+    "Overview": "अवलोकन", "Data import": "डेटा आयात", "Visualizations": "दृश्यांकन",
+    "Forecasting": "पूर्वानुमान", "KPI evaluation": "KPI मूल्यांकन", "Recommendations": "सिफारिशें",
+    "Methodology": "कार्यप्रणाली", "Weather": "मौसम", "Weather impact": "मौसम प्रभाव",
+    "Financials": "वित्तीय", "Reports": "रिपोर्ट", "Crop health": "फसल स्वास्थ्य",
+    "Farm profiles": "खेत प्रोफ़ाइल", "WORKSPACE": "कार्यस्थान", "Workspace": "कार्यस्थान",
+    "Loading live data": "लाइव डेटा लोड हो रहा है", "Live data connected": "लाइव डेटा जुड़ा है",
+    "Search insights...": "जानकारियां खोजें...", "Log out": "लॉग आउट",
+    "Production overview": "उत्पादन अवलोकन", "Turn production data into decisions you can defend.": "उत्पादन डेटा को भरोसेमंद निर्णयों में बदलें।",
+    "Explore the evidence behind your agribusiness decisions.": "अपने कृषि-व्यवसाय के निर्णयों के पीछे के प्रमाण देखें।",
+    "Refine view": "दृश्य परिष्कृत करें", "Geography": "भौगोलिक क्षेत्र", "Crop": "फसल",
+    "Year": "वर्ष", "All geographies": "सभी क्षेत्र", "All crops": "सभी फसलें",
+    "All years": "सभी वर्ष", "Reset": "रीसेट", "Export view": "दृश्य निर्यात करें",
+    "Loading your workspace": "आपका कार्यस्थान लोड हो रहा है", "Checking your saved session...": "आपका सेव किया सत्र जांचा जा रहा है",
+    "GROW WITH CLARITY": "स्पष्टता के साथ बढ़ें", "Better harvests start with better approaches.": "बेहतर फसल की शुरुआत बेहतर तरीकों से होती है।",
+    "Turn field data into practical insight with a workspace built for modern agriculture teams.": "आधुनिक कृषि टीमों के लिए बने कार्यस्थान से खेत के डेटा को उपयोगी जानकारी में बदलें।",
+    "JOIN THE WORKSPACE": "कार्यस्थान से जुड़ें", "WELCOME BACK": "वापसी पर स्वागत है",
+    "Create your account": "अपना खाता बनाएं", "Welcome to your farm intelligence": "अपने कृषि इंटेलिजेंस में आपका स्वागत है",
+    "Set up your free analytics workspace in a few seconds.": "कुछ ही सेकंड में अपना निःशुल्क विश्लेषण कार्यस्थान बनाएं।",
+    "Sign in to continue to your analytics workspace.": "अपने विश्लेषण कार्यस्थान में जारी रखने के लिए साइन इन करें।",
+    "Log in": "लॉग इन", "Sign up": "साइन अप", "Full name": "पूरा नाम",
+    "Your name": "आपका नाम", "Email address": "ईमेल पता", "Password": "पासवर्ड",
+    "Forgot password?": "पासवर्ड भूल गए?", "At least 6 characters": "कम से कम 6 अक्षर",
+    "Create workspace": "कार्यस्थान बनाएं", "Enter AgriVision": "AgriVision खोलें",
+    "See the full picture": "पूरी तस्वीर देखें", "Plan with confidence": "विश्वास के साथ योजना बनाएं",
+    "Track production trends across every crop and geography.": "हर फसल और क्षेत्र में उत्पादन रुझान देखें।",
+    "Use transparent forecasts and evidence-backed recommendations.": "पारदर्शी पूर्वानुमान और प्रमाण-आधारित सिफारिशों का उपयोग करें।"
+  },
+  pa: {
+    "Overview": "ਜਾਇਜ਼ਾ", "Data import": "ਡਾਟਾ ਆਯਾਤ", "Visualizations": "ਦ੍ਰਿਸ਼",
+    "Forecasting": "ਪੂਰਵ ਅਨੁਮਾਨ", "KPI evaluation": "KPI ਮੁਲਾਂਕਣ", "Recommendations": "ਸਿਫ਼ਾਰਸ਼ਾਂ",
+    "Methodology": "ਵਿਧੀ", "Weather": "ਮੌਸਮ", "Weather impact": "ਮੌਸਮ ਦਾ ਪ੍ਰਭਾਵ",
+    "Financials": "ਵਿੱਤੀ ਜਾਣਕਾਰੀ", "Reports": "ਰਿਪੋਰਟਾਂ", "Crop health": "ਫ਼ਸਲ ਦੀ ਸਿਹਤ",
+    "Farm profiles": "ਖੇਤ ਪ੍ਰੋਫ਼ਾਈਲ", "WORKSPACE": "ਕਾਰਜਸਥਾਨ", "Workspace": "ਕਾਰਜਸਥਾਨ",
+    "Loading live data": "ਲਾਈਵ ਡਾਟਾ ਲੋਡ ਹੋ ਰਿਹਾ ਹੈ", "Live data connected": "ਲਾਈਵ ਡਾਟਾ ਜੁੜਿਆ ਹੋਇਆ ਹੈ",
+    "Search insights...": "ਜਾਣਕਾਰੀ ਖੋਜੋ...", "Log out": "ਲੌਗ ਆਉਟ",
+    "Production overview": "ਉਤਪਾਦਨ ਜਾਇਜ਼ਾ", "Turn production data into decisions you can defend.": "ਉਤਪਾਦਨ ਡਾਟੇ ਨੂੰ ਭਰੋਸੇਯੋਗ ਫ਼ੈਸਲਿਆਂ ਵਿੱਚ ਬਦਲੋ।",
+    "Explore the evidence behind your agribusiness decisions.": "ਆਪਣੇ ਖੇਤੀਬਾੜੀ ਫ਼ੈਸਲਿਆਂ ਦੇ ਪਿੱਛੇ ਸਬੂਤ ਵੇਖੋ।",
+    "Refine view": "ਦ੍ਰਿਸ਼ ਸੁਧਾਰੋ", "Geography": "ਭੂਗੋਲ", "Crop": "ਫ਼ਸਲ",
+    "Year": "ਸਾਲ", "All geographies": "ਸਾਰੇ ਖੇਤਰ", "All crops": "ਸਾਰੀਆਂ ਫ਼ਸਲਾਂ",
+    "All years": "ਸਾਰੇ ਸਾਲ", "Reset": "ਰੀਸੈੱਟ", "Export view": "ਦ੍ਰਿਸ਼ ਨਿਰਯਾਤ ਕਰੋ",
+    "Loading your workspace": "ਤੁਹਾਡਾ ਕਾਰਜਸਥਾਨ ਲੋਡ ਹੋ ਰਿਹਾ ਹੈ", "Checking your saved session...": "ਤੁਹਾਡਾ ਸੇਵ ਕੀਤਾ ਸੈਸ਼ਨ ਜਾਂਚਿਆ ਜਾ ਰਿਹਾ ਹੈ",
+    "GROW WITH CLARITY": "ਸਪਸ਼ਟਤਾ ਨਾਲ ਵਧੋ", "Better harvests start with better approaches.": "ਬਿਹਤਰ ਫ਼ਸਲਾਂ ਦੀ ਸ਼ੁਰੂਆਤ ਬਿਹਤਰ ਤਰੀਕਿਆਂ ਨਾਲ ਹੁੰਦੀ ਹੈ।",
+    "Turn field data into practical insight with a workspace built for modern agriculture teams.": "ਆਧੁਨਿਕ ਖੇਤੀ ਟੀਮਾਂ ਲਈ ਬਣੇ ਕਾਰਜਸਥਾਨ ਨਾਲ ਖੇਤ ਡਾਟੇ ਨੂੰ ਲਾਭਦਾਇਕ ਜਾਣਕਾਰੀ ਵਿੱਚ ਬਦਲੋ।",
+    "JOIN THE WORKSPACE": "ਕਾਰਜਸਥਾਨ ਨਾਲ ਜੁੜੋ", "WELCOME BACK": "ਜੀ ਆਇਆਂ ਨੂੰ",
+    "Create your account": "ਆਪਣਾ ਖਾਤਾ ਬਣਾਓ", "Welcome to your farm intelligence": "ਆਪਣੀ ਖੇਤੀਬਾੜੀ ਜਾਣਕਾਰੀ ਵਿੱਚ ਜੀ ਆਇਆਂ ਨੂੰ",
+    "Set up your free analytics workspace in a few seconds.": "ਕੁਝ ਸਕਿੰਟਾਂ ਵਿੱਚ ਆਪਣਾ ਮੁਫ਼ਤ ਵਿਸ਼ਲੇਸ਼ਣ ਕਾਰਜਸਥਾਨ ਬਣਾਓ।",
+    "Sign in to continue to your analytics workspace.": "ਆਪਣੇ ਵਿਸ਼ਲੇਸ਼ਣ ਕਾਰਜਸਥਾਨ ਵਿੱਚ ਜਾਰੀ ਰੱਖਣ ਲਈ ਸਾਈਨ ਇਨ ਕਰੋ।",
+    "Log in": "ਲੌਗ ਇਨ", "Sign up": "ਸਾਈਨ ਅਪ", "Full name": "ਪੂਰਾ ਨਾਮ",
+    "Your name": "ਤੁਹਾਡਾ ਨਾਮ", "Email address": "ਈਮੇਲ ਪਤਾ", "Password": "ਪਾਸਵਰਡ",
+    "Forgot password?": "ਪਾਸਵਰਡ ਭੁੱਲ ਗਏ?", "At least 6 characters": "ਘੱਟੋ-ਘੱਟ 6 ਅੱਖਰ",
+    "Create workspace": "ਕਾਰਜਸਥਾਨ ਬਣਾਓ", "Enter AgriVision": "AgriVision ਖੋਲ੍ਹੋ",
+    "See the full picture": "ਪੂਰੀ ਤਸਵੀਰ ਵੇਖੋ", "Plan with confidence": "ਭਰੋਸੇ ਨਾਲ ਯੋਜਨਾ ਬਣਾਓ",
+    "Track production trends across every crop and geography.": "ਹਰ ਫ਼ਸਲ ਅਤੇ ਖੇਤਰ ਵਿੱਚ ਉਤਪਾਦਨ ਰੁਝਾਨ ਵੇਖੋ।",
+    "Use transparent forecasts and evidence-backed recommendations.": "ਪਾਰਦਰਸ਼ੀ ਪੂਰਵ ਅਨੁਮਾਨ ਅਤੇ ਸਬੂਤ-ਅਧਾਰਿਤ ਸਿਫ਼ਾਰਸ਼ਾਂ ਵਰਤੋ।"
+  }
+};
+
+function translate(language: Language, text: string) {
+  return translations[language][text] ?? text;
+}
+
+function LanguageSwitcher({ language, onChange }: { language: Language; onChange: (language: Language) => void }) {
+  return <label className="language-switcher">
+    <span className="sr-only">Language</span>
+    <select aria-label="Language" value={language} onChange={(event) => onChange(event.target.value as Language)}>
+      {LANGUAGE_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+    </select>
+  </label>;
+}
 
 const SOURCES = [
   { crop: "Rice", slug: "rice-production.csv" },
@@ -89,6 +169,7 @@ function formatNumber(n: number) {
 }
 
 export default function Home() {
+  const [language, setLanguage] = useState<Language>("en");
   const [authenticated, setAuthenticated] = useState(false);
   const [authReady, setAuthReady] = useState(false);
   const [authMode, setAuthMode] = useState<AuthMode>("signup");
@@ -123,6 +204,10 @@ export default function Home() {
   const [selectedFarmId, setSelectedFarmId] = useState("");
 
   useEffect(() => {
+    const savedLanguage = window.localStorage.getItem("agrivision-language");
+    if (savedLanguage === "en" || savedLanguage === "hi" || savedLanguage === "pa") {
+      setLanguage(savedLanguage);
+    }
     const savedSession = window.localStorage.getItem("agrivision-authenticated");
     const savedName = window.localStorage.getItem("agrivision-auth-name");
     const savedEmail = window.localStorage.getItem("agrivision-auth-email");
@@ -133,6 +218,11 @@ export default function Home() {
     }
     setAuthReady(true);
   }, []);
+
+  useEffect(() => {
+    window.localStorage.setItem("agrivision-language", language);
+    document.documentElement.lang = language;
+  }, [language]);
 
   useEffect(() => {
     const savedFarms = window.localStorage.getItem("agrivision-farms");
@@ -233,7 +323,7 @@ export default function Home() {
   const concentration = total ? ((byCrop[0]?.production ?? 0) / total) * 100 : 0;
 
   if (!authReady) {
-    return <main className="auth-page"><section className="auth-panel"><div className="auth-card"><p className="eyebrow">AGRIVISION</p><h2>Loading your workspace</h2><p className="auth-subtitle">Checking your saved session...</p></div></section></main>;
+    return <main className="auth-page"><section className="auth-panel"><div className="auth-card"><LanguageSwitcher language={language} onChange={setLanguage} /><p className="eyebrow">AGRIVISION</p><h2>{translate(language, "Loading your workspace")}</h2><p className="auth-subtitle">{translate(language, "Checking your saved session...")}</p></div></section></main>;
   }
 
   if (!authenticated) {
@@ -249,6 +339,8 @@ export default function Home() {
       onEmailChange={setAuthEmail}
       onPasswordChange={setAuthPassword}
       onSubmit={submitAuth}
+      language={language}
+      onLanguageChange={setLanguage}
     />;
   }
 
@@ -454,16 +546,16 @@ export default function Home() {
   return <div className="app-shell">
     <aside className="sidebar">
       <div className="brand"><div className="brand-mark"><Sprout size={22} /></div><div><strong>AgriVision</strong><small>AGRIBUSINESS ANALYTICS</small></div></div>
-      <div className="workspace-label">WORKSPACE <Settings2 size={13} /></div>
-      <nav>{nav.map((item) => <button key={item.label} className={section === item.label ? "active" : ""} onClick={() => setSection(item.label)}>{item.icon}<span>{item.label}</span>{section === item.label && <ChevronRight size={15} className="nav-chevron" />}</button>)}</nav>
-      <div className="sidebar-bottom"><div className="data-status"><span className={loading ? "dot loading" : "dot"}></span><div><b>{loading ? "Loading live data" : "Live data connected"}</b><small>Our World in Data · FAOSTAT</small></div></div><div className="profile"><div className="avatar">JA</div><div><b>Junior Analyst</b><small>Internship workspace</small></div></div></div>
+      <div className="workspace-label">{translate(language, "WORKSPACE")} <Settings2 size={13} /></div>
+      <nav>{nav.map((item) => <button key={item.label} className={section === item.label ? "active" : ""} onClick={() => setSection(item.label)}>{item.icon}<span>{translate(language, item.label)}</span>{section === item.label && <ChevronRight size={15} className="nav-chevron" />}</button>)}</nav>
+      <div className="sidebar-bottom"><div className="data-status"><span className={loading ? "dot loading" : "dot"}></span><div><b>{loading ? translate(language, "Loading live data") : translate(language, "Live data connected")}</b><small>Our World in Data · FAOSTAT</small></div></div><div className="profile"><div className="avatar">JA</div><div><b>Junior Analyst</b><small>Internship workspace</small></div></div></div>
     </aside>
     <main className="main">
-      <header className="topbar"><button className="mobile-menu"><Menu size={20} /></button><div className="breadcrumb">Workspace <span>/</span> <b>{section}</b></div><div className="top-actions"><div className="search"><Search size={16} /><input placeholder="Search insights..." /></div><div className="profile-menu"><button className="profile-trigger" aria-expanded={profileOpen} onClick={() => setProfileOpen((open) => !open)}><span className="header-avatar"><UserCircle size={19} /></span><span className="profile-trigger-copy"><b>{authName || "Junior Analyst"}</b><small>{authEmail || "Internship workspace"}</small></span><ChevronDown size={15} /></button>{profileOpen && <div className="profile-dropdown"><div className="profile-dropdown-heading"><span className="header-avatar large"><UserCircle size={21} /></span><div><b>{authName || "Junior Analyst"}</b><small>{authEmail || "Internship workspace"}</small></div></div><button className="logout-button" onClick={logout}><LogOut size={16} /> Log out</button></div>}</div></div></header>
+      <header className="topbar"><button className="mobile-menu"><Menu size={20} /></button><div className="breadcrumb">{translate(language, "Workspace")} <span>/</span> <b>{translate(language, section)}</b></div><div className="top-actions"><LanguageSwitcher language={language} onChange={setLanguage} /><div className="search"><Search size={16} /><input placeholder={translate(language, "Search insights...")} /></div><div className="profile-menu"><button className="profile-trigger" aria-expanded={profileOpen} onClick={() => setProfileOpen((open) => !open)}><span className="header-avatar"><UserCircle size={19} /></span><span className="profile-trigger-copy"><b>{authName || "Junior Analyst"}</b><small>{authEmail || "Internship workspace"}</small></span><ChevronDown size={15} /></button>{profileOpen && <div className="profile-dropdown"><div className="profile-dropdown-heading"><span className="header-avatar large"><UserCircle size={21} /></span><div><b>{authName || "Junior Analyst"}</b><small>{authEmail || "Internship workspace"}</small></div></div><button className="logout-button" onClick={logout}><LogOut size={16} /> {translate(language, "Log out")}</button></div>}</div></div></header>
       <div className="content">
         {error && <div className="alert error">{error} Check your internet connection and reload.</div>}
-        <div className="page-heading"><div><p className="eyebrow">AGRICULTURAL INTELLIGENCE · 2026</p><h1>{section === "Overview" ? "Production overview" : section}</h1><p className="subtitle">{section === "Overview" ? "Turn production data into decisions you can defend." : "Explore the evidence behind your agribusiness decisions."}</p><p className="data-source">Source: <b>{dataSource}</b> · Requested window {DATA_START_YEAR}–{DATA_END_YEAR} · Latest available {latestYear ?? "—"}{lastUpdated && <> · Updated {lastUpdated.toLocaleTimeString()}</>}</p></div></div>
-        {section === "Overview" && <div className="filter-toolbar" aria-label="Overview filters"><div className="filter-toolbar-title"><SlidersHorizontal size={16} /><span>Refine view</span></div><label>Geography<select value={country} onChange={(event) => setCountry(event.target.value)}><option>All geographies</option>{countries.map((value) => <option key={value}>{value}</option>)}</select></label><label>Crop<select value={crop} onChange={(event) => setCrop(event.target.value)}><option>All crops</option>{crops.map((value) => <option key={value}>{value}</option>)}</select></label><label>Year<select value={year} onChange={(event) => setYear(event.target.value)}><option>All years</option>{years.map((value) => <option key={value}>{value}</option>)}</select></label><button className="toolbar-reset" type="button" onClick={() => { setCountry("All geographies"); setCrop("All crops"); setYear("All years"); }}><RotateCcw size={14} /> Reset</button><button className="toolbar-export" type="button" onClick={downloadCsv}><CloudDownload size={15} /> Export view</button></div>}
+        <div className="page-heading"><div><p className="eyebrow">AGRICULTURAL INTELLIGENCE · 2026</p><h1>{translate(language, section === "Overview" ? "Production overview" : section)}</h1><p className="subtitle">{translate(language, section === "Overview" ? "Turn production data into decisions you can defend." : "Explore the evidence behind your agribusiness decisions.")}</p><p className="data-source">Source: <b>{dataSource}</b> · Requested window {DATA_START_YEAR}–{DATA_END_YEAR} · Latest available {latestYear ?? "—"}{lastUpdated && <> · Updated {lastUpdated.toLocaleTimeString()}</>}</p></div></div>
+        {section === "Overview" && <div className="filter-toolbar" aria-label="Overview filters"><div className="filter-toolbar-title"><SlidersHorizontal size={16} /><span>{translate(language, "Refine view")}</span></div><label>{translate(language, "Geography")}<select value={country} onChange={(event) => setCountry(event.target.value)}><option>All geographies</option>{countries.map((value) => <option key={value}>{value}</option>)}</select></label><label>{translate(language, "Crop")}<select value={crop} onChange={(event) => setCrop(event.target.value)}><option>All crops</option>{crops.map((value) => <option key={value}>{value}</option>)}</select></label><label>{translate(language, "Year")}<select value={year} onChange={(event) => setYear(event.target.value)}><option>All years</option>{years.map((value) => <option key={value}>{value}</option>)}</select></label><button className="toolbar-reset" type="button" onClick={() => { setCountry("All geographies"); setCrop("All crops"); setYear("All years"); }}><RotateCcw size={14} /> {translate(language, "Reset")}</button><button className="toolbar-export" type="button" onClick={downloadCsv}><CloudDownload size={15} /> {translate(language, "Export view")}</button></div>}
         {section === "Data import" ? <ImportPanel upload={upload} message={uploadMessage} rowCount={rows.length} source={dataSource} preview={uploadedPreview} /> : section === "Methodology" ? <Methodology rows={rows} filtered={filtered} source={dataSource} lastUpdated={lastUpdated} quality={quality} /> : section === "Forecasting" ? <Forecast yearly={yearly} /> : section === "KPI evaluation" ? <Kpi filtered={filtered} total={total} growth={growth} concentration={concentration} targetGrowth={targetGrowth} setTargetGrowth={setTargetGrowth} /> : section === "Recommendations" ? <Recommendations filtered={filtered} growth={growth} concentration={concentration} targetGrowth={targetGrowth} crop={byCrop[0]?.name} /> : section === "Visualizations" ? <Visualizations rows={rows} filtered={filtered} byCrop={byCrop} chartType={visualChart} setChartType={setVisualChart} loading={loading} /> : section === "Weather" ? <WeatherPanel city={weatherCity} setCity={setWeatherCity} weather={weather} error={weatherError} load={loadWeather} /> : section === "Weather impact" ? <WeatherImpactPanel rows={filtered} weather={weather} upload={upload} /> : section === "Financials" ? <FinancialPanel filtered={filtered} total={total} /> : section === "Reports" ? <ReportsPanel printReport={printReport} downloadCsv={downloadCsv} /> : section === "Crop health" ? <DiseasePanel image={diseaseImage} setImage={setDiseaseImage} /> : section === "Farm profiles" ? <FarmProfiles farms={farms} selectedFarmId={selectedFarmId} setSelectedFarmId={setSelectedFarmId} saveFarms={saveFarms} /> : <Dashboard filtered={filtered} yearly={yearly} byCrop={byCrop} total={total} countries={countries} years={years} latestYear={latestYear} firstYear={firstYear} growth={growth} concentration={concentration} loading={loading} onOpenSection={setSection} />}
       </div>
     </main>
@@ -663,7 +755,7 @@ function DiseasePanel({ image, setImage }: { image: string; setImage: (value: st
 
 function AuthScreen({
   mode, name, email, password, error, onModeChange, onNameChange, onEmailChange,
-  onPasswordChange, onSubmit, notice
+  onPasswordChange, onSubmit, notice, language, onLanguageChange
 }: {
   mode: AuthMode;
   name: string;
@@ -676,8 +768,11 @@ function AuthScreen({
   onEmailChange: (value: string) => void;
   onPasswordChange: (value: string) => void;
   onSubmit: (event: React.FormEvent<HTMLFormElement>) => void;
+  language: Language;
+  onLanguageChange: (language: Language) => void;
 }) {
   const isSignup = mode === "signup";
+  const t = (text: string) => translate(language, text);
   return <main className="auth-page">
     <div className="auth-decoration auth-decoration-one" />
     <div className="auth-decoration auth-decoration-two" />
@@ -692,33 +787,34 @@ function AuthScreen({
       </div>
       <div className="auth-brand"><span className="auth-brand-mark"><Sprout size={23} /></span><span><b>AgriVision</b><small>AGRIBUSINESS ANALYTICS</small></span></div>
       <div className="auth-story-copy">
-        <p className="eyebrow">GROW WITH CLARITY</p>
-        <h1>Better harvests start with better approaches.</h1>
-        <p>Turn field data into practical insight with a workspace built for modern agriculture teams.</p>
+        <p className="eyebrow">{t("GROW WITH CLARITY")}</p>
+        <h1>{t("Better harvests start with better approaches.")}</h1>
+        <p>{t("Turn field data into practical insight with a workspace built for modern agriculture teams.")}</p>
       </div>
       <div className="auth-feature-list">
-        <div><span>01</span><p><b>See the full picture</b><small>Track production trends across every crop and geography.</small></p></div>
-        <div><span>02</span><p><b>Plan with confidence</b><small>Use transparent forecasts and evidence-backed recommendations.</small></p></div>
+        <div><span>01</span><p><b>{t("See the full picture")}</b><small>{t("Track production trends across every crop and geography.")}</small></p></div>
+        <div><span>02</span><p><b>{t("Plan with confidence")}</b><small>{t("Use transparent forecasts and evidence-backed recommendations.")}</small></p></div>
       </div>
       <p className="auth-footnote">“Data is the new soil for sustainable growth.”</p>
     </section>
     <section className="auth-panel">
       <div className="auth-card">
         <div className="auth-mobile-mark"><Sprout size={22} /></div>
-        <p className="eyebrow">{isSignup ? "JOIN THE WORKSPACE" : "WELCOME BACK"}</p>
-        <h2>{isSignup ? "Create your account" : "Welcome to your farm intelligence"}</h2>
-        <p className="auth-subtitle">{isSignup ? "Set up your free analytics workspace in a few seconds." : "Sign in to continue to your analytics workspace."}</p>
+        <LanguageSwitcher language={language} onChange={onLanguageChange} />
+        <p className="eyebrow">{t(isSignup ? "JOIN THE WORKSPACE" : "WELCOME BACK")}</p>
+        <h2>{t(isSignup ? "Create your account" : "Welcome to your farm intelligence")}</h2>
+        <p className="auth-subtitle">{t(isSignup ? "Set up your free analytics workspace in a few seconds." : "Sign in to continue to your analytics workspace.")}</p>
         <div className="auth-tabs" role="tablist" aria-label="Authentication">
-          <button type="button" className={!isSignup ? "active" : ""} onClick={() => onModeChange("login")}>Log in</button>
-          <button type="button" className={isSignup ? "active" : ""} onClick={() => onModeChange("signup")}>Sign up</button>
+          <button type="button" className={!isSignup ? "active" : ""} onClick={() => onModeChange("login")}>{t("Log in")}</button>
+          <button type="button" className={isSignup ? "active" : ""} onClick={() => onModeChange("signup")}>{t("Sign up")}</button>
         </div>
         <form className="auth-form" onSubmit={onSubmit}>
-          {isSignup && <label>Full name<input value={name} onChange={(event) => onNameChange(event.target.value)} placeholder="Your name" autoComplete="name" /></label>}
-          <label>Email address<input type="email" value={email} onChange={(event) => onEmailChange(event.target.value)} placeholder="you@farm.com" autoComplete="email" /></label>
-          <label>Password <span className="auth-label-note">{!isSignup && "Forgot password?"}</span><input type="password" value={password} onChange={(event) => onPasswordChange(event.target.value)} placeholder="At least 6 characters" autoComplete={isSignup ? "new-password" : "current-password"} /></label>
+          {isSignup && <label>{t("Full name")}<input value={name} onChange={(event) => onNameChange(event.target.value)} placeholder={t("Your name")} autoComplete="name" /></label>}
+          <label>{t("Email address")}<input type="email" value={email} onChange={(event) => onEmailChange(event.target.value)} placeholder="you@farm.com" autoComplete="email" /></label>
+          <label>{t("Password")} <span className="auth-label-note">{!isSignup && t("Forgot password?")}</span><input type="password" value={password} onChange={(event) => onPasswordChange(event.target.value)} placeholder={t("At least 6 characters")} autoComplete={isSignup ? "new-password" : "current-password"} /></label>
           {error && <p className="auth-error" role="alert">{error}</p>}
           {notice && <p className="auth-notice" role="status">{notice}</p>}
-          <button className="auth-submit" type="submit">{isSignup ? "Create workspace" : "Enter AgriVision"} <ChevronRight size={17} /></button>
+          <button className="auth-submit" type="submit">{t(isSignup ? "Create workspace" : "Enter AgriVision")} <ChevronRight size={17} /></button>
         </form>
         <p className="auth-terms">{isSignup ? "By signing up, you agree to our workspace terms." : "New to AgriVision? Use the Sign up tab to get started."}</p>
       </div>

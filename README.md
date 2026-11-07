@@ -35,6 +35,15 @@ AgriVision is a smart agribusiness analytics dashboard for exploring crop-produc
 
 ## Run locally
 
+AgriVision runs as two local processes:
+
+```text
+Browser → Next.js frontend (localhost:3000) → FastAPI API (127.0.0.1:8000)
+                                      ├── OWID / FAOSTAT production data
+                                      ├── OpenWeather weather data
+                                      └── Groq crop-health analysis
+```
+
 ### 1. Install frontend dependencies
 
 ```powershell
@@ -73,13 +82,29 @@ cd "D:\Agri Vision"
 npm run dev
 ```
 
-Open http://localhost:3000. The frontend uses `http://127.0.0.1:8000` as its default backend URL. To change it, copy [.env.example](.env.example) to `.env.local` and set `NEXT_PUBLIC_API_URL`.
+Open http://localhost:3000. The frontend uses `http://127.0.0.1:8000` as its default backend URL. To change it, create `.env.local` with the `NEXT_PUBLIC_API_URL` value shown below.
 
 If the backend is unavailable, CSV uploads can use the browser-side validation fallback. PDF uploads and backend-powered weather, crop-health, and market-price features require the API.
 
-## Optional services
+## Configuration and optional services
 
-Keep secrets in the ignored `backend/.env` file. Never expose them through a `NEXT_PUBLIC_` variable or commit them.
+The frontend only needs the public API URL. Create `.env.local` with:
+
+```dotenv
+NEXT_PUBLIC_API_URL=http://127.0.0.1:8000
+```
+
+Keep backend credentials in the ignored `backend/.env` file. Do not copy backend secrets into `.env.local`, expose them through a `NEXT_PUBLIC_` variable, or commit them.
+
+```dotenv
+# backend/.env
+OPENWEATHER_API_KEY=your-openweather-api-key
+GROQ_API_KEY=your-groq-api-key
+# Optional: use another vision model available to your Groq account.
+GROQ_VISION_MODEL=qwen/qwen3.8-27b
+```
+
+PowerShell can create the backend file with:
 
 ```powershell
 Set-Content -Path "backend\.env" -Value @"
@@ -95,6 +120,8 @@ GROQ_VISION_MODEL=qwen/qwen3.8-27b
 - The market-price workspace uses public FAOSTAT producer-price data and a DBnomics catalog fallback when FAOSTAT is rate-limited.
 
 Crop-health results are AI-assisted visual screening guidance, not a laboratory diagnosis. The service rejects non-image uploads and images larger than 10 MB.
+
+The default production dataset is fetched on the first API request, so the backend needs internet access even when optional service keys are not configured.
 
 ## Backend API
 
@@ -114,7 +141,7 @@ All analytics endpoints use the active dataset. The optional `country`, `crop`, 
 | `GET` | `/api/weather` | Return geocoded current weather and a five-day forecast |
 | `GET` | `/api/market-prices` | Return FAOSTAT producer-price data or catalog fallback |
 
-Uploading a new CSV or PDF replaces the active in-memory dataset. All subsequent analytics use the cleaned upload.
+Uploading a new CSV or PDF replaces the active in-memory dataset. All subsequent analytics use the cleaned upload until the backend restarts.
 
 ## Upload format
 

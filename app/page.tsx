@@ -758,7 +758,8 @@ function DiseasePanel({ image, setImage }: { image: string; setImage: (value: st
 function AuthScreen({
   mode, name, email, password, error, onModeChange, onNameChange, onEmailChange,
   onPasswordChange, onSubmit, notice, language, onLanguageChange
-}: {
+}: 
+{
   mode: AuthMode;
   name: string;
   email: string;

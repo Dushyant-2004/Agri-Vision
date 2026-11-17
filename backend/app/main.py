@@ -40,8 +40,10 @@ COUNTRY_CENTROIDS = {
 
 
 def load_local_environment() -> None:
+
     """Load simple KEY=value settings from the ignored local backend .env file."""
     env_path = Path(__file__).resolve().parents[1] / ".env"
+    
     if not env_path.exists():
         return
 

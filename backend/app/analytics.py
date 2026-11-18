@@ -79,9 +79,11 @@ def _clean_frame(frame: pd.DataFrame) -> tuple[pd.DataFrame, dict[str, Any]]:
     normalized = normalized.drop_duplicates()
     normalized["year"] = normalized["year"].astype(int)
     normalized["production"] = normalized["production"].astype(float)
+
     if normalized.empty:
         raise ValueError("CSV contains no valid rows after cleaning.")
-    return normalized, {
+    return normalized, 
+    {
         "records_before": original_count,
         "records_after": len(normalized),
         "missing_rows_removed": missing_count,

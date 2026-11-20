@@ -566,6 +566,7 @@ function FarmProfiles({ farms, selectedFarmId, setSelectedFarmId, saveFarms }: {
  const [farmName, setFarmName] = useState("");
  const [farmLocation, setFarmLocation] = useState("");
  const [owner, setOwner] = useState("");
+ const [fieldError, setFieldError] = useState("");
  const selectedFarm = farms.find((farm) => farm.id === selectedFarmId);
 
  function addFarm(event: React.FormEvent<HTMLFormElement>) {
@@ -589,16 +590,37 @@ function FarmProfiles({ farms, selectedFarmId, setSelectedFarmId, saveFarms }: {
    event.preventDefault();
    if (!selectedFarm) return;
    const form = new FormData(event.currentTarget);
+   const name = String(form.get("fieldName") ?? "").trim();
+   const crop = String(form.get("fieldCrop") ?? "").trim();
+   const area = Number(form.get("fieldArea"));
+   const latitude = Number(form.get("fieldLatitude"));
+   const longitude = Number(form.get("fieldLongitude"));
+   if (!name || !crop) {
+     setFieldError("Enter a field name and crop.");
+     return;
+   }
+   if (!Number.isFinite(area) || area <= 0) {
+     setFieldError("Area must be greater than 0 hectares.");
+     return;
+   }
+   if (!Number.isFinite(latitude) || latitude <= -90 || latitude >= 90) {
+     setFieldError("Latitude must be between -90 and 90, excluding the poles.");
+     return;
+   }
+   if (!Number.isFinite(longitude) || longitude < -180 || longitude > 180) {
+     setFieldError("Longitude must be between -180 and 180.");
+     return;
+   }
    const field: FarmField = {
      id: crypto.randomUUID(),
-     name: String(form.get("fieldName") ?? "").trim(),
-     crop: String(form.get("fieldCrop") ?? "").trim(),
-     area: Number(form.get("fieldArea")),
-     latitude: Number(form.get("fieldLatitude")),
-     longitude: Number(form.get("fieldLongitude"))
+     name,
+     crop,
+     area,
+     latitude,
+     longitude
    };
-   if (!field.name || !field.crop || !Number.isFinite(field.area) || field.area <= 0 || !Number.isFinite(field.latitude) || !Number.isFinite(field.longitude)) return;
    saveFarms(farms.map((farm) => farm.id === selectedFarm.id ? { ...farm, fields: [...farm.fields, field] } : farm));
+   setFieldError("");
    event.currentTarget.reset();
  }
 
@@ -620,7 +642,7 @@ function FarmProfiles({ farms, selectedFarmId, setSelectedFarmId, saveFarms }: {
      <section className="card farm-list-card"><div className="card-heading"><div><h2>Your farms</h2><p>{farms.length} saved profile{farms.length === 1 ? "" : "s"}</p></div></div>{farms.length ? <div className="farm-list">{farms.map((farm) => <button key={farm.id} type="button" className={`farm-list-item${farm.id === selectedFarmId ? " active" : ""}`} onClick={() => setSelectedFarmId(farm.id)}><span className="farm-list-icon"><Sprout size={16} /></span><span><b>{farm.name}</b><small>{farm.location} · {farm.fields.length} field{farm.fields.length === 1 ? "" : "s"}</small></span><ChevronRight size={15} /></button>)}</div> : <p className="empty-copy">No farm profiles yet. Add your first farm to begin mapping fields.</p>}</section>
      <section className="card farm-form-card"><p className="eyebrow">NEW FARM</p><h2>Create a farm profile</h2><form className="farm-form" onSubmit={addFarm}><label>Farm name<input value={farmName} onChange={(event) => setFarmName(event.target.value)} placeholder="Green Valley Farm" required /></label><label>Location<input value={farmLocation} onChange={(event) => setFarmLocation(event.target.value)} placeholder="Pune, India" required /></label><label>Owner or team<input value={owner} onChange={(event) => setOwner(event.target.value)} placeholder="Operations team" /></label><button className="primary-button" type="submit"><Plus size={16} /> Add farm</button></form></section>
    </div>
-   {selectedFarm && <><section className="farm-detail-header"><div><p className="eyebrow">ACTIVE FARM</p><h2>{selectedFarm.name}</h2><p>{selectedFarm.location} · Managed by {selectedFarm.owner}</p></div><button className="danger-button" type="button" onClick={removeFarm}><Trash2 size={15} /> Delete farm</button></section><section className="farm-map-grid"><div className="card farm-map-card"><div className="card-heading"><div><h2>Field map</h2><p>Markers show the coordinates saved for this farm.</p></div><span className="live-tag">{selectedFarm.fields.length} FIELDS</span></div>{selectedFarm.fields.length ? <LocationMap latitude={selectedFarm.fields[0].latitude} longitude={selectedFarm.fields[0].longitude} location={selectedFarm.name} fields={selectedFarm.fields} /> : <div className="map-empty"><MapPinned size={26} /><p>Add a field with latitude and longitude to place it on the map.</p></div>}</div><section className="card field-form-card"><p className="eyebrow">ADD FIELD</p><h2>Field details</h2><form className="farm-form" onSubmit={addField}><label>Field name<input name="fieldName" placeholder="North field" required /></label><label>Crop<input name="fieldCrop" placeholder="Rice" required /></label><div className="form-two-col"><label>Area (hectares)<input name="fieldArea" type="number" min="0.1" step="0.1" placeholder="12.5" required /></label><label>Latitude<input name="fieldLatitude" type="number" step="any" min="-90" max="90" placeholder="18.5204" required /></label></div><label>Longitude<input name="fieldLongitude" type="number" step="any" min="-180" max="180" placeholder="73.8567" required /></label><button className="primary-button" type="submit"><Plus size={16} /> Add field</button></form></section></section><section className="card table-card"><div className="card-heading"><div><h2>Fields in {selectedFarm.name}</h2><p>Field-level metadata for planning and map-based monitoring.</p></div></div><div className="table-wrap"><table><thead><tr><th>Field</th><th>Crop</th><th>Area</th><th>Coordinates</th><th></th></tr></thead><tbody>{selectedFarm.fields.length ? selectedFarm.fields.map((field) => <tr key={field.id}><td><b>{field.name}</b></td><td>{field.crop}</td><td>{field.area.toLocaleString()} ha</td><td>{field.latitude.toFixed(4)}, {field.longitude.toFixed(4)}</td><td className="right"><button className="icon-button" type="button" title={`Remove ${field.name}`} onClick={() => removeField(field.id)}><Trash2 size={15} /></button></td></tr>) : <tr><td colSpan={5}>No fields added yet.</td></tr>}</tbody></table></div></section></>}
+   {selectedFarm && <><section className="farm-detail-header"><div><p className="eyebrow">ACTIVE FARM</p><h2>{selectedFarm.name}</h2><p>{selectedFarm.location} · Managed by {selectedFarm.owner}</p></div><button className="danger-button" type="button" onClick={removeFarm}><Trash2 size={15} /> Delete farm</button></section><section className="farm-map-grid"><div className="card farm-map-card"><div className="card-heading"><div><h2>Field map</h2><p>Markers show the coordinates saved for this farm.</p></div><span className="live-tag">{selectedFarm.fields.length} FIELDS</span></div>{selectedFarm.fields.length ? <LocationMap latitude={selectedFarm.fields[0].latitude} longitude={selectedFarm.fields[0].longitude} location={selectedFarm.name} fields={selectedFarm.fields} /> : <div className="map-empty"><MapPinned size={26} /><p>Add a field with latitude and longitude to place it on the map.</p></div>}</div><section className="card field-form-card"><p className="eyebrow">ADD FIELD</p><h2>Field details</h2><form className="farm-form" noValidate onSubmit={addField}><label>Field name<input name="fieldName" placeholder="North field" required /></label><label>Crop<input name="fieldCrop" placeholder="Rice" required /></label><div className="form-two-col"><label>Area (hectares)<input name="fieldArea" type="number" min="0.1" step="0.1" placeholder="12.5" required /></label><label>Latitude<input name="fieldLatitude" type="number" step="any" min="-90" max="90" placeholder="18.5204" required /></label></div><label>Longitude<input name="fieldLongitude" type="number" step="any" min="-180" max="180" placeholder="73.8567" required /></label>{fieldError && <p className="form-error" role="alert">{fieldError}</p>}<button className="primary-button" type="submit"><Plus size={16} /> Add field</button></form></section></section><section className="card table-card"><div className="card-heading"><div><h2>Fields in {selectedFarm.name}</h2><p>Field-level metadata for planning and map-based monitoring.</p></div></div><div className="table-wrap"><table><thead><tr><th>Field</th><th>Crop</th><th>Area</th><th>Coordinates</th><th></th></tr></thead><tbody>{selectedFarm.fields.length ? selectedFarm.fields.map((field) => <tr key={field.id}><td><b>{field.name}</b></td><td>{field.crop}</td><td>{field.area.toLocaleString()} ha</td><td>{field.latitude.toFixed(4)}, {field.longitude.toFixed(4)}</td><td className="right"><button className="icon-button" type="button" title={`Remove ${field.name}`} onClick={() => removeField(field.id)}><Trash2 size={15} /></button></td></tr>) : <tr><td colSpan={5}>No fields added yet.</td></tr>}</tbody></table></div></section></>}
  </div>;
 }
 

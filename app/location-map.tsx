@@ -18,10 +18,18 @@ type LeafletElement = HTMLDivElement & {
   _agrivision_map?: L.Map;
 };
 
+function isMapCoordinate(latitude: number, longitude: number) {
+  return Number.isFinite(latitude)
+    && Number.isFinite(longitude)
+    && latitude > -90
+    && latitude < 90
+    && longitude >= -180
+    && longitude <= 180;
+}
 
-
- export default function LocationMap({ latitude, longitude, location, fields = [] }: { latitude: number; longitude: number; location: string; fields?: MapField[] }) {
+export default function LocationMap({ latitude, longitude, location, fields = [] }: { latitude: number; longitude: number; location: string; fields?: MapField[] }) {
   const mapElement = useRef<HTMLDivElement>(null);
+  const mapFields = useMemo(() => fields.filter((field) => isMapCoordinate(field.latitude, field.longitude)), [fields]);
   const markerIcon = useMemo(() => L.divIcon({
     className: "location-marker-icon",
     html: '<span class="location-marker-pulse"></span><span class="location-marker-pin"><span></span></span>',
@@ -37,13 +45,18 @@ type LeafletElement = HTMLDivElement & {
     delete element._agrivision_map;
     delete element._leaflet_id;
 
-    const map = L.map(element, { scrollWheelZoom: true }).setView([latitude, longitude], 10);
+    const center: [number, number] = mapFields[0] && isMapCoordinate(mapFields[0].latitude, mapFields[0].longitude)
+      ? [mapFields[0].latitude, mapFields[0].longitude] as [number, number]
+      : isMapCoordinate(latitude, longitude) ? [latitude, longitude] : [20, 0];
+    const map = L.map(element, { scrollWheelZoom: true }).setView(center, 10);
     element._agrivision_map = map;
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
     }).addTo(map);
-    L.marker([latitude, longitude], { icon: markerIcon, title: location }).addTo(map);
-    fields.forEach((field) => {
+    if (isMapCoordinate(latitude, longitude)) {
+      L.marker([latitude, longitude], { icon: markerIcon, title: location }).addTo(map);
+    }
+    mapFields.forEach((field) => {
       const fieldIcon = L.divIcon({
         className: "field-marker-icon",
         html: '<span class="field-marker-dot"></span>',
@@ -54,8 +67,8 @@ type LeafletElement = HTMLDivElement & {
         .bindTooltip(`${field.name} · ${field.crop}`, { direction: "top", offset: [0, -8] })
         .addTo(map);
     });
-    if (fields.length > 1) {
-      map.fitBounds(L.latLngBounds(fields.map((field) => [field.latitude, field.longitude])), { padding: [28, 28] });
+    if (mapFields.length > 1) {
+      map.fitBounds(L.latLngBounds(mapFields.map((field) => [field.latitude, field.longitude])), { padding: [28, 28] });
     }
 
     return () => {
@@ -63,7 +76,7 @@ type LeafletElement = HTMLDivElement & {
       delete element._agrivision_map;
       delete element._leaflet_id;
     };
-  }, [latitude, longitude, location, fields, markerIcon]);
+  }, [latitude, longitude, location, mapFields, markerIcon]);
 
   return <div className="leaflet-map-wrap" aria-label={`Map centered on ${location}`}>
     <div ref={mapElement} className="leaflet-map" />

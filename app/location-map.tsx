@@ -30,7 +30,9 @@ function isMapCoordinate(latitude: number, longitude: number) {
 export default function LocationMap({ latitude, longitude, location, fields = [] }: { latitude: number; longitude: number; location: string; fields?: MapField[] }) {
   const mapElement = useRef<HTMLDivElement>(null);
   const mapFields = useMemo(() => fields.filter((field) => isMapCoordinate(field.latitude, field.longitude)), [fields]);
-  const markerIcon = useMemo(() => L.divIcon({
+  const markerIcon = useMemo(() => L.divIcon
+  
+  ({
     className: "location-marker-icon",
     html: '<span class="location-marker-pulse"></span><span class="location-marker-pin"><span></span></span>',
     iconSize: [32, 42],

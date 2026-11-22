@@ -39,7 +39,8 @@ export default function LocationMap({ latitude, longitude, location, fields = []
     iconAnchor: [16, 42],
   }), []);
 
-  useEffect(() => {
+  useEffect(() => 
+    {
     const element = mapElement.current as LeafletElement | null;
     if (!element) return;
 
@@ -58,17 +59,22 @@ export default function LocationMap({ latitude, longitude, location, fields = []
     if (isMapCoordinate(latitude, longitude)) {
       L.marker([latitude, longitude], { icon: markerIcon, title: location }).addTo(map);
     }
-    mapFields.forEach((field) => {
+
+    mapFields.forEach((field) => 
+      
+      {
       const fieldIcon = L.divIcon({
         className: "field-marker-icon",
         html: '<span class="field-marker-dot"></span>',
         iconSize: [18, 18],
         iconAnchor: [9, 9],
       });
+
       L.marker([field.latitude, field.longitude], { icon: fieldIcon, title: field.name })
         .bindTooltip(`${field.name} · ${field.crop}`, { direction: "top", offset: [0, -8] })
         .addTo(map);
     });
+    
     if (mapFields.length > 1) {
       map.fitBounds(L.latLngBounds(mapFields.map((field) => [field.latitude, field.longitude])), { padding: [28, 28] });
     }

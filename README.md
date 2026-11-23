@@ -123,6 +123,17 @@ Crop-health results are AI-assisted visual screening guidance, not a laboratory 
 
 The default production dataset is fetched on the first API request, so the backend needs internet access even when optional service keys are not configured.
 
+## Location maps
+
+The weather and farm-profile map uses Leaflet with OpenStreetMap tiles. The map:
+
+- Shows the searched location with the primary location marker when valid coordinates are available.
+- Shows valid field coordinates as separate markers with field-name and crop tooltips.
+- Fits the view to multiple field markers and otherwise centers on the first field or searched location.
+- Ignores field markers with invalid latitude or longitude values and falls back to a world view when no valid location is available.
+
+OpenStreetMap tiles are used with the required OpenStreetMap attribution. Map tiles require internet access.
+
 ## Backend API
 
 All analytics endpoints use the active dataset. The optional `country`, `crop`, and `year` query parameters filter results where supported.

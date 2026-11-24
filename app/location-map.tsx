@@ -75,11 +75,14 @@ export default function LocationMap({ latitude, longitude, location, fields = []
         .addTo(map);
     });
     
-    if (mapFields.length > 1) {
+    if (mapFields.length > 1) 
+    {
       map.fitBounds(L.latLngBounds(mapFields.map((field) => [field.latitude, field.longitude])), { padding: [28, 28] });
     }
 
-    return () => {
+    return () => 
+      
+      {
       map.remove();
       delete element._agrivision_map;
       delete element._leaflet_id;

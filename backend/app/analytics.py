@@ -189,7 +189,8 @@ def forecast(frame: pd.DataFrame, horizon: int = 3) -> dict[str, Any]:
     recent = values[-min(5, len(values)) :]
     baseline = float(np.mean(recent))
     future_years = [int(years[-1] + index) for index in range(1, horizon + 1)]
-    return {
+    return 
+{
         "method": "Five-year moving-average baseline",
         "historical": [{"year": int(y), "production": float(v)} for y, v in zip(years, values)],
         "future": [{"year": year, "production": baseline} for year in future_years],

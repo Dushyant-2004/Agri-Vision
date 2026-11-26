@@ -72,6 +72,28 @@ def test_forecast_requires_three_years():
         forecast(frame)
 
 
+def test_forecast_returns_historical_and_future_production():
+    frame = pd.DataFrame(
+        [
+            {"country": "India", "crop": "Rice", "year": 2020, "production": 10},
+            {"country": "India", "crop": "Rice", "year": 2021, "production": 20},
+            {"country": "India", "crop": "Rice", "year": 2022, "production": 30},
+        ]
+    )
+
+    result = forecast(frame, horizon=2)
+
+    assert result["historical"] == [
+        {"year": 2020, "production": 10.0},
+        {"year": 2021, "production": 20.0},
+        {"year": 2022, "production": 30.0},
+    ]
+    assert result["future"] == [
+        {"year": 2023, "production": 20.0},
+        {"year": 2024, "production": 20.0},
+    ]
+
+
 def test_kpis_reports_unavailable_optional_metrics():
     frame = pd.DataFrame(
         [
